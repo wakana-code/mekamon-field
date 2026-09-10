@@ -1,0 +1,1385 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>メカモン — 歯車の野生</title>
+<style>
+:root{--cyan:#70f3de;--gold:#ffd781;--ink:#101e2a;--glass:rgba(10,23,33,.82)}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#101b29;color:#edf8fa;font:14px system-ui,"Yu Gothic",sans-serif}
+canvas#game{display:block;width:100vw;height:100vh}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid #56717d;background:#233b48;border-radius:7px;padding:10px 15px;transition:.15s}
+button:hover{background:#365b68;border-color:var(--cyan)}button:disabled{opacity:.35;cursor:default}
+button.primary{background:var(--cyan);color:#10252a;border:0;font-weight:800}
+small,.muted{color:#abc2cc}h1,h2,h3,p{margin-top:0}h2{font-size:24px}h3{color:var(--cyan)}
+kbd{display:inline-block;background:#2d4654;border:1px solid #66818b;border-bottom-width:3px;border-radius:4px;padding:0 6px;margin:2px;font:12px monospace;color:white}
+#hud{position:fixed;inset:0;pointer-events:none;display:none;text-shadow:0 2px 4px #000}
+.glass{background:var(--glass);border:1px solid #607e8055;backdrop-filter:blur(8px);border-radius:12px}
+#status{position:absolute;left:22px;top:20px;width:300px;padding:15px}
+#place{font-weight:900;letter-spacing:3px;font-size:18px;color:var(--cyan)}
+#vitals{margin-top:10px;display:flex;gap:10px;align-items:center}
+.bar{height:7px;background:#142731;border-radius:8px;overflow:hidden;flex:1}
+.bar>i{display:block;height:100%;background:var(--cyan);transition:width .2s}
+#resources{margin-top:10px;font-size:13px;color:#d9e8ed}
+#mapbox{position:absolute;right:22px;top:20px;padding:9px;background:#101f2cd9;border-radius:50%;border:1px solid #83c2b15c}
+#map{width:160px;height:160px;display:block;border-radius:50%}
+#target{position:absolute;left:50%;top:18%;transform:translateX(-50%);width:310px;padding:12px 16px;display:none;text-align:center}
+#target .bar{margin:9px 0 5px}
+#reticle{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px;border:1px solid #ffffffc0;border-radius:50%;box-shadow:0 0 6px #0007}
+#reticle:after{content:"";position:absolute;inset:7px;border-radius:50%;background:white}
+#reticle.lock{border-color:var(--gold);width:26px;height:26px;margin:-13px}
+#reticle.lock:after{inset:10px;background:var(--gold)}
+#prompt{position:absolute;left:50%;top:61%;transform:translateX(-50%);padding:9px 16px;white-space:nowrap;display:none}
+#bottom{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:min(880px,95vw)}
+#mode{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;margin-bottom:7px}
+#mode strong{color:var(--gold)}
+#party{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;pointer-events:auto}
+.slot{min-height:69px;text-align:left;padding:8px;background:#0e2130dd;border-color:#3e5868;font-size:12px}
+.slot.selected{border:2px solid var(--cyan);padding:7px;box-shadow:0 0 14px #64efd326}
+.slot .bar{margin-top:6px;height:4px}
+#moves{display:flex;gap:6px;margin-top:7px;pointer-events:auto}
+#moves button{flex:1;padding:6px;font-size:12px;background:#122937d9}
+#tips{font-size:11px;text-align:center;margin-top:8px;color:#b6c9d2}
+#log{position:absolute;left:22px;bottom:185px;width:340px;display:flex;flex-direction:column;gap:7px}
+.toast{background:#102630df;border-left:3px solid var(--cyan);padding:9px 12px;border-radius:0 5px 5px 0;font-size:13px;animation:appear .2s}
+@keyframes appear{from{opacity:0;transform:translateY(8px)}}
+#damage{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 130px #ff3544;opacity:0}
+#banner{position:fixed;top:32%;left:50%;transform:translateX(-50%);text-align:center;font-size:32px;letter-spacing:5px;font-weight:900;pointer-events:none;text-shadow:0 3px 18px #000;color:var(--gold);opacity:0;transition:opacity .3s}
+.overlay{position:fixed;inset:0;background:#07151ca8;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(5px)}
+.card{width:min(860px,96vw);max-height:92vh;overflow:auto;padding:30px;border:1px solid #709a9955;border-radius:20px;background:linear-gradient(135deg,#152d3bf5,#0a1925f5);box-shadow:0 20px 100px #0008}
+.logo{font-size:clamp(44px,8vw,82px);letter-spacing:12px;font-weight:1000;margin:0;color:#e5fff8;line-height:1.3}
+.subtitle{letter-spacing:7px;font-size:12px;color:var(--cyan);margin-bottom:23px}
+.intro{line-height:1.8;color:#c1d6dc;max-width:680px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px 22px;margin:20px 0;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rule{height:1px;background:#44657477;margin:20px 0}
+#panel{display:none}
+#panelContent{line-height:1.6}
+#panelContent .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.entry{background:#152b37;border:1px solid #446171;border-radius:10px;padding:14px}
+.entry.legend{border-color:#c6a56c}
+.entry h3{font-size:16px;margin-bottom:8px}
+.tag{display:inline-block;padding:1px 7px;background:#37515b;border-radius:4px;font-size:11px;margin-right:4px}
+.statline{font-size:12px;color:#b8d1da}
+#panelContent button{margin:4px}
+#panelContent .partyrow{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #42607055;padding:9px 0;gap:10px}
+#fps{position:absolute;right:24px;bottom:16px;font-size:10px;color:#7b96a0}
+@media(max-width:800px){#log{bottom:220px;width:260px;font-size:11px}#status{width:240px;left:10px;top:10px}#mapbox{right:10px;top:10px}#map{width:115px;height:115px}.controls{grid-template-columns:1fr}.card{padding:20px}#tips{font-size:9px}.slot{font-size:10px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div id="status" class="glass">
+  <div id="place">草原</div>
+  <small id="weather"></small>
+  <div id="vitals"><span>YOU</span><div class="bar"><i id="playerHP"></i></div><span id="hpText"></span></div>
+  <div id="resources"></div>
+ </div>
+ <div id="mapbox"><canvas id="map" width="180" height="180"></canvas></div>
+ <div id="target" class="glass"></div>
+ <div id="reticle"></div>
+ <div id="prompt" class="glass"></div>
+ <div id="log"></div>
+ <div id="bottom">
+  <div id="mode" class="glass"></div>
+  <div id="party"></div>
+  <div id="moves"></div>
+  <div id="tips">WASD 移動 / Shift ダッシュ / マウス 視点 / 左クリック 投擲 / Q モード / Tab 選択 / 1–4 技 / R 回収 / E 調べる / F 作業 / J 図鑑 / V 視点 / Esc メニュー</div>
+ </div>
+ <div id="fps"></div>
+</div>
+<div id="damage"></div><div id="banner"></div>
+<div id="start" class="overlay">
+ <div class="card">
+  <div class="subtitle">PROCEDURAL OPEN WORLD / OFFLINE</div>
+  <h1 class="logo">メカモン</h1>
+  <p style="letter-spacing:5px;color:#ffd781">— 歯車の野生 —</p>
+  <p class="intro">風に揺れる草原、銀の大河、光の届かない地下。<br>
+  17種の機械生命を見つけ、狙い、捕まえよう。戦いも、仕事も、この世界の中で。</p>
+  <div class="controls">
+   <div><kbd>W A S D</kbd> 移動　<kbd>Shift</kbd> ダッシュ</div>
+   <div>マウス：視点　<kbd>V</kbd> 一人称 / 三人称</div>
+   <div>左クリック：放物線投擲　右クリック：攻撃指示</div>
+   <div><kbd>Q</kbd> 空ボール / 手持ちモード</div>
+   <div><kbd>Tab</kbd> 手持ち選択　<kbd>1</kbd>〜<kbd>4</kbd> 技指示</div>
+   <div><kbd>R</kbd> パートナー回収　<kbd>F</kbd> 作業指示</div>
+   <div><kbd>E</kbd> 小屋・船・ハシゴ・素材・落ちたボール</div>
+   <div><kbd>J</kbd> 図鑑　<kbd>B</kbd> ボール種別</div>
+   <div><kbd>L</kbd> 製作したランタン ON/OFF　<kbd>M</kbd> 音</div>
+   <div><kbd>Esc</kbd> 一時停止・マウス解除</div>
+  </div>
+  <p class="muted" style="font-size:12px">初期装備：メカボール3個＋ブリキット Lv3。川は船で渡航。木と岩は E で手採取も可能。<br>
+  強敵は弱らせてから捕獲。スプラギアは水面から跳ねた瞬間を狙おう。自動保存対応。</p>
+  <div class="row"><button class="primary" id="startButton">フィールドへ</button><button id="resetButton">セーブを消去</button><span id="saveInfo" class="muted"></span></div>
+ </div>
+</div>
+<div id="panel" class="overlay">
+ <div class="card">
+  <div class="row" style="justify-content:space-between;margin-bottom:18px">
+   <h2 id="panelTitle" style="margin:0"></h2><button id="closePanel">フィールドに戻る</button>
+  </div>
+  <div id="panelContent"></div>
+ </div>
+</div>
+
+<script>
+"use strict";
+(() => {
+const $ = id => document.getElementById(id);
+const canvas=$("game"), gl=canvas.getContext("webgl",{antialias:true,alpha:false});
+if(!gl){$("start").innerHTML="<div class='card'>WebGLが利用できません。ハードウェアアクセラレーションを有効にしてください。</div>";return;}
+const TAU=Math.PI*2, clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), lerp=(a,b,t)=>a+(b-a)*t;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z), rand=(a,b)=>a+Math.random()*(b-a);
+let seed=81923;
+function rng(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
+const rr=(a,b)=>a+rng()*(b-a);
+const vadd=(a,b)=>a.map((x,i)=>x+b[i]), vsub=(a,b)=>a.map((x,i)=>x-b[i]);
+const vmul=(a,s)=>a.map(x=>x*s), dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{let l=Math.hypot(...a)||1;return a.map(x=>x/l);};
+const hex=h=>[parseInt(h.slice(0,2),16)/255,parseInt(h.slice(2,4),16)/255,parseInt(h.slice(4,6),16)/255];
+function identity(){return [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];}
+function mul(a,b){let o=new Array(16).fill(0);for(let c=0;c<4;c++)for(let r=0;r<4;r++)for(let k=0;k<4;k++)o[c*4+r]+=a[k*4+r]*b[c*4+k];return o;}
+function transform(x,y,z,ry=0,sx=1,sy=sx,sz=sx,rz=0){
+ const c=Math.cos(ry),s=Math.sin(ry),a=Math.cos(rz),b=Math.sin(rz);
+ return [c*a*sx,b*sx,-s*a*sx,0,-c*b*sy,a*sy,s*b*sy,0,s*sz,0,c*sz,0,x,y,z,1];
+}
+function perspective(fov,aspect,n,f){let t=1/Math.tan(fov/2);return [t/aspect,0,0,0,0,t,0,0,0,0,(f+n)/(n-f),-1,0,0,2*f*n/(n-f),0];}
+function lookAt(eye,at){
+ let z=norm(vsub(eye,at)),x=norm(cross([0,1,0],z)),y=cross(z,x);
+ return [x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1];
+}
+const vs=`
+attribute vec3 aPos,aNormal,aColor;
+uniform mat4 uModel,uVP;
+uniform float uTime,uWater;
+varying vec3 vPos,vNormal,vColor;
+void main(){
+ vec3 p=aPos;
+ if(uWater>0.5) p.y+=sin(p.x*.36+uTime*1.5)*.13+cos(p.z*.29-uTime)*.11;
+ vec4 w=uModel*vec4(p,1.);
+ vPos=w.xyz; vNormal=normalize(mat3(uModel)*aNormal); vColor=aColor;
+ if(uWater>0.5) vNormal=normalize(vec3(-cos(p.x*.36+uTime*1.5)*.16,1.,sin(p.z*.29-uTime)*.12));
+ gl_Position=uVP*w;
+}`;
+const fs=`
+precision mediump float;
+varying vec3 vPos,vNormal,vColor;
+uniform vec3 uEye,uFog,uLightPos;
+uniform float uFogNear,uFogFar,uDark,uLamp,uGlow,uAlpha,uWater,uTime;
+void main(){
+ vec3 n=normalize(vNormal), l=normalize(vec3(-.4,.85,.35)), v=normalize(uEye-vPos);
+ float diffuse=max(dot(n,l),0.);
+ float spec=pow(max(dot(reflect(-l,n),v),0.),36.);
+ float point=pow(max(0.,1.-distance(vPos,uLightPos)/max(1.,uLamp)),1.5);
+ float ambient=mix(.38,.013,uDark);
+ vec3 col=vColor*(ambient+diffuse*.63*(1.-uDark)+point*uDark*1.8+uGlow);
+ col+=vec3(.69,.84,.9)*spec*.34*(1.-uDark)+vec3(.62,.88,.82)*point*.09;
+ if(uWater>.5){
+  float fres=pow(1.-max(dot(n,v),0.),3.);
+  col=mix(col,uFog*.95,fres*.6)+vec3(.7,.94,1.)*spec*.7;
+  col+=.028*sin(vPos.z*3.+vPos.x*1.7+uTime*2.);
+ }
+ float fog=smoothstep(uFogNear,uFogFar,distance(vPos,uEye));
+ gl_FragColor=vec4(mix(col,uFog,fog),uAlpha);
+}`;
+function shader(type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+const program=gl.createProgram();
+gl.attachShader(program,shader(gl.VERTEX_SHADER,vs));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);
+if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+gl.useProgram(program);
+const attrs={};
+for(const a of ["aPos","aNormal","aColor"])attrs[a]=gl.getAttribLocation(program,a);
+const un={};
+for(const n of ["uModel","uVP","uTime","uWater","uEye","uFog","uLightPos","uFogNear","uFogFar","uDark","uLamp","uGlow","uAlpha"])un[n]=gl.getUniformLocation(program,n);
+gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+function mesh(data){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);return {b,n:data.length/9};}
+function draw(m,mat,colorGlow=0,alpha=1,water=0){
+ gl.bindBuffer(gl.ARRAY_BUFFER,m.b);
+ let i=0;for(const a of ["aPos","aNormal","aColor"]){gl.enableVertexAttribArray(attrs[a]);gl.vertexAttribPointer(attrs[a],3,gl.FLOAT,false,36,i);i+=12;}
+ gl.uniformMatrix4fv(un.uModel,false,mat);gl.uniform1f(un.uGlow,colorGlow);gl.uniform1f(un.uAlpha,alpha);gl.uniform1f(un.uWater,water);
+ gl.drawArrays(gl.TRIANGLES,0,m.n);
+}
+function tri(out,a,b,c,col,ns){
+ let n=norm(cross(vsub(b,a),vsub(c,a)));
+ [a,b,c].forEach((p,i)=>out.push(...p,...(ns?ns[i]:n),...(Array.isArray(col[0])?col[i]:col)));
+}
+const primitives={};
+function makePrimitives(){
+ let o=[];
+ const q=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+ for(const f of [[0,3,2,1],[4,5,6,7],[0,4,7,3],[1,2,6,5],[3,7,6,2],[0,1,5,4]]){
+  tri(o,q[f[0]],q[f[1]],q[f[2]],[1,1,1]);tri(o,q[f[0]],q[f[2]],q[f[3]],[1,1,1]);
+ }
+ primitives.box=o;
+ for(const kind of ["sphere","cylinder","cone"]){
+  o=[];let n=12,m=kind==="sphere"?8:1;
+  const p=(j,k)=>{
+   let a=k/n*TAU;
+   if(kind==="sphere"){let b=j/m*Math.PI;return [Math.sin(b)*Math.cos(a),Math.cos(b),Math.sin(b)*Math.sin(a)];}
+   let r=kind==="cone"?1-j:1;return [Math.cos(a)*r,j*2-1,Math.sin(a)*r];
+  };
+  for(let j=0;j<m;j++)for(let k=0;k<n;k++){
+   let a=p(j,k),b=p(j+1,k),c=p(j+1,k+1),d=p(j,k+1);
+   tri(o,a,b,c,[1,1,1],kind==="sphere"?[a,b,c]:null);tri(o,a,c,d,[1,1,1],kind==="sphere"?[a,c,d]:null);
+  }
+  if(kind!=="sphere")for(let k=0;k<n;k++){
+   tri(o,[0,-1,0],p(0,k+1),p(0,k),[1,1,1]);
+   if(kind==="cylinder")tri(o,[0,1,0],p(1,k),p(1,k+1),[1,1,1]);
+  }
+  primitives[kind]=o;
+ }
+}
+makePrimitives();
+function part(out,kind,pos,scale,color,ry=0,rz=0){
+ const c=typeof color==="string"?hex(color):color;
+ const m=transform(...pos,ry,...scale,rz),d=primitives[kind];
+ for(let i=0;i<d.length;i+=9){
+  let x=d[i],y=d[i+1],z=d[i+2];
+  const n0=[d[i+3]/scale[0],d[i+4]/scale[1],d[i+5]/scale[2]];
+  const rot=transform(0,0,0,ry,1,1,1,rz);
+  let n=norm([rot[0]*n0[0]+rot[4]*n0[1]+rot[8]*n0[2],rot[1]*n0[0]+rot[5]*n0[1]+rot[9]*n0[2],rot[2]*n0[0]+rot[6]*n0[1]+rot[10]*n0[2]]);
+  out.push(m[0]*x+m[4]*y+m[8]*z+m[12],m[1]*x+m[5]*y+m[9]*z+m[13],m[2]*x+m[6]*y+m[10]*z+m[14],...n,...c);
+ }
+}
+function simple(kind,color){let a=[];part(a,kind,[0,0,0],[1,1,1],color);return mesh(a);}
+const whiteBall=simple("sphere","e4f5f7"), goldBall=simple("sphere","ffce65"), blueFx=simple("sphere","5affdf"), redFx=simple("sphere","ff705d");
+const ringMesh=(()=>{let a=[];for(let i=0;i<48;i++){let t=i/48*TAU,u=(i+1)/48*TAU;tri(a,[Math.cos(t),0,Math.sin(t)],[Math.cos(u),0,Math.sin(u)],[Math.cos(u)*.94,0,Math.sin(u)*.94],hex("91ffeb"));tri(a,[Math.cos(t),0,Math.sin(t)],[Math.cos(u)*.94,0,Math.sin(u)*.94],[Math.cos(t)*.94,0,Math.sin(t)*.94],hex("91ffeb"));}return mesh(a);})();
+
+// タイプ相性：行=攻撃タイプ、列=防御タイプ。未記載は1倍。
+const TYPES=["鋼","電気","水","岩","風","炎"];
+const AFFINITY={
+ "鋼":{"岩":2,"炎":.5,"水":.5},
+ "電気":{"水":2,"風":2,"岩":.5,"電気":.5},
+ "水":{"炎":2,"岩":2,"電気":.5,"水":.5},
+ "岩":{"風":2,"炎":2,"鋼":.5},
+ "風":{"水":1.5,"岩":.5,"電気":.5},
+ "炎":{"鋼":2,"風":1.5,"水":.5,"岩":.5}
+};
+const MOVES=[
+ {n:"ギアタックル",t:"鋼",p:40,a:.97,cd:1.8},
+ {n:"スパーク",t:"電気",p:45,a:.94,cd:2.3},
+ {n:"エアカッター",t:"風",p:48,a:.93,cd:2.4},
+ {n:"アクアボルト",t:"水",p:48,a:.95,cd:2.4},
+ {n:"ロックパイル",t:"岩",p:60,a:.88,cd:3.3},
+ {n:"フレアリベット",t:"炎",p:62,a:.9,cd:3.2},
+ {n:"メタルブレイク",t:"鋼",p:78,a:.9,cd:4.4},
+ {n:"サンダーレール",t:"電気",p:84,a:.88,cd:4.8},
+ {n:"ストームドライブ",t:"風",p:85,a:.88,cd:4.8},
+ {n:"ハイドロラム",t:"水",p:90,a:.86,cd:5},
+ {n:"地殻裁断",t:"岩",p:125,a:.94,cd:6},
+ {n:"零界放電",t:"電気",p:130,a:.93,cd:6},
+ {n:"源流リブート",t:"水",p:125,a:.95,cd:6}
+];
+// 各種の全データはゲーム内図鑑でも常時確認可能。
+// b = [HP,攻撃,防御,素早さ] / learn = [技ID,習得Lv] / catch = 捕獲率0～255
+const SPECIES=[
+ {n:"ブリキット",hab:"草原",type:"鋼",temper:"温厚",move:"歩行",b:[46,46,65,34],catch:230,learn:[[0,1],[4,7],[6,15]],skills:["バリア","採掘"],shape:"bot",color:"a7c8c4",desc:"丸い胸部と角張った足。前腕の装甲を盾にする。"},
+ {n:"コイルン",hab:"草原",type:"電気",temper:"逃走",move:"歩行",b:[36,45,30,86],catch:220,learn:[[0,1],[1,4],[7,16]],skills:["発掘","警戒"],shape:"hare",color:"e6c45d",desc:"長いコイル耳と二つの駆動輪を持つ高速機。"},
+ {n:"ハネギア",hab:"草原",type:"風",temper:"温厚",move:"浮遊",b:[40,42,38,69],catch:215,learn:[[2,1],[0,5],[8,17]],skills:["推進","警戒"],shape:"bird",color:"a6d9e8",desc:"薄い金属翼と朱色の尾翼。開けた空を滑空する。"},
+ {n:"バイトロン",hab:"草原",type:"鋼",temper:"攻撃",move:"歩行",b:[57,72,47,61],catch:125,learn:[[0,1],[6,8],[5,18]],skills:["伐採"],shape:"wolf",color:"b26759",desc:"低い四脚と巨大な鋼の牙。草原ではごくまれ。"},
+ {n:"ソウビート",hab:"森",type:"鋼",temper:"温厚",move:"歩行",b:[62,59,70,30],catch:180,learn:[[0,1],[2,6],[6,15]],skills:["伐採","バリア"],shape:"beetle",color:"69a76c",desc:"緑の甲殻に銀の鋸角を備えた六脚機。"},
+ {n:"フォグドローン",hab:"森",type:"風",temper:"攻撃",move:"浮遊",b:[48,69,40,82],catch:115,learn:[[2,1],[1,8],[8,18]],skills:["警戒","推進"],shape:"drone",color:"849fb1",desc:"四つのプロペラと赤い単眼。樹間を広範囲に巡回。"},
+ {n:"ルミナット",hab:"森",type:"電気",temper:"温厚",move:"浮遊",b:[44,48,43,61],catch:195,learn:[[1,1],[2,7],[7,19]],skills:["照明","警戒"],shape:"lamp",color:"e5cf88",desc:"琥珀色の発光球を籠で囲ったランタン型。"},
+ {n:"ソーングラブ",hab:"森",type:"炎",temper:"攻撃",move:"歩行",b:[65,78,52,44],catch:110,learn:[[5,1],[0,7],[6,19]],skills:["伐採","発掘"],shape:"crab",color:"c86147",desc:"朱色の爪とトゲ付き甲板。熱した鋏で木を切る。"},
+ {n:"リベットフィン",hab:"川",type:"水",temper:"温厚",move:"遊泳",b:[53,50,52,65],catch:180,learn:[[3,1],[0,6],[9,18]],skills:["水中採取","推進"],shape:"fish",color:"54b4c6",desc:"青い装甲魚。透明な水面越しにも捕獲可能。"},
+ {n:"スプラギア",hab:"川",type:"水",temper:"逃走",move:"遊泳＋跳躍",b:[52,68,42,92],catch:135,learn:[[3,1],[2,9],[9,20]],skills:["推進","水中採取"],shape:"dolphin",color:"869ee6",desc:"長い吻と背びれ。水中ではボールを弾き、跳躍中だけ命中する。"},
+ {n:"ガードロック",hab:"岩山",type:"岩",temper:"警戒",move:"歩行",b:[83,66,112,22],catch:88,learn:[[4,1],[0,8],[6,21]],skills:["採掘","バリア"],shape:"golem",color:"9b9889",desc:"積層岩のような重装甲。赤いコアが胸にある。"},
+ {n:"マグナホーン",hab:"岩山",type:"炎",temper:"攻撃",move:"歩行",b:[78,96,88,42],catch:70,learn:[[5,1],[4,12],[6,23]],skills:["採掘","発掘"],shape:"rhino",color:"a7674a",desc:"黒鉄の四脚と赤熱した長い角。斜面を巡回する。"},
+ {n:"エコーバット",hab:"洞窟",type:"風",temper:"攻撃",move:"浮遊",b:[63,99,52,98],catch:65,learn:[[2,1],[7,15],[8,25]],skills:["照明","警戒"],shape:"bat",color:"9173b6",desc:"紫の広い翼と白い受信角。暗所の空中を徘徊する。"},
+ {n:"アビスレッグ",hab:"地下",type:"電気",temper:"警戒",move:"歩行",b:[87,108,92,56],catch:48,learn:[[1,1],[4,14],[7,26],[6,32]],skills:["採掘","照明","発掘"],shape:"spider",color:"5e9d9d",desc:"八脚の蒼い探索機。光る腹部と非常に長い関節脚。"},
+ {n:"オルドタイタン",hab:"岩山",type:"岩",temper:"攻撃",move:"歩行",b:[155,145,165,45],catch:7,learn:[[4,1],[6,1],[10,1]],skills:["採掘","バリア"],shape:"titan",color:"c8af75",legend:true,desc:"山頂に一体。接近すると重力環を展開。HP40%未満で赤熱し攻撃が激化。"},
+ {n:"ノクスコア",hab:"地下",type:"電気",temper:"攻撃",move:"浮遊",b:[145,170,120,110],catch:5,learn:[[7,1],[8,1],[11,1]],skills:["照明","バリア","警戒"],shape:"core",color:"a389db",legend:true,desc:"地下最深部に一体。浮遊する三重の機構核。瀕死になると零界環が加速。"},
+ {n:"リヴァゼロ",hab:"川",type:"水",temper:"攻撃",move:"浮遊",b:[160,150,135,90],catch:6,learn:[[3,1],[9,1],[12,1]],skills:["推進","水中採取","照明"],shape:"serpent",color:"71d7d5",legend:true,desc:"源流の島に一体。環状の長い身体で水を操る。瀕死で暴流形態になる。"}
+];
+const typeColors={"鋼":"b4c9d2","電気":"ffe07a","水":"68d8ed","岩":"d8bb8e","風":"aceddc","炎":"ff906b"};
+function buildSpecies(s){
+ const o=[],c=s.color, dark="344957",silver="bdced4",eye=s.temper==="攻撃"?"ff6f57":"85ffe3";
+ const P=(k,p,sz,col=c,ry=0,rz=0)=>part(o,k,p,sz,col,ry,rz);
+ const eyes=(y=1.45,z=-.58,gap=.25)=>{for(let x of [-gap,gap])P("sphere",[x,y,z],[.12,.12,.09],eye);};
+ const legs=(count=4,width=.65,length=.8)=>{
+  for(let i=0;i<count;i++){let side=i%2?1:-1,z=(Math.floor(i/2)-(count/2-1)/2)*.55;
+   P("box",[side*width,.45,z],[.14,.47,.16],dark,0,side*.22);
+   P("box",[side*(width+.08),.13,z-.1],[.25,.13,.35],silver);
+  }
+ };
+ switch(s.shape){
+ case "bot":
+  P("sphere",[0,1.05,0],[.66,.65,.53]);P("box",[0,1.82,-.08],[.47,.31,.4]);
+  P("box",[0,1.12,-.52],[.32,.21,.06],"66d9c8");eyes(1.85,-.49);
+  for(let x of [-.88,.88]){P("box",[x,1.05,0],[.22,.45,.34],silver);P("sphere",[x,1.55,0],[.23,.23,.23],dark);}
+  legs(2,.37);break;
+ case "hare":
+  P("sphere",[0,.7,0],[.45,.5,.63]);P("sphere",[0,1.25,-.4],[.4,.35,.38]);
+  for(let x of [-.24,.24]){P("cylinder",[x,1.9,-.32],[.12,.46,.13],silver,0,x);P("sphere",[x,2.38,-.32],[.15,.15,.15],"ffe49a");}
+  eyes(1.35,-.73,.18);for(let x of [-.52,.52])P("cylinder",[x,.35,.18],[.35,.16,.35],dark,0,Math.PI/2);break;
+ case "bird":case "bat":
+  P("sphere",[0,.35,0],[.35,.34,.8]);P("cone",[0,.39,-.94],[.16,.36,.16],"e6bc78",0,Math.PI/2);
+  for(let side of [-1,1]){P("box",[side*.95,.3,.08],[.95,.075,.48],c,side*.4,side*.15);P("box",[side*1.5,.26,.28],[.36,.06,.42],silver,side*.5);}
+  P("box",[0,.43,.94],[.4,.07,.38],"d97c64");eyes(.53,-.65,.18);
+  if(s.shape==="bat")for(let x of [-.23,.23])P("cone",[x,.91,-.36],[.14,.45,.14],silver);
+  break;
+ case "wolf":case "rhino":
+  P("box",[0,1.05,.1],[.65,.47,1]);P("sphere",[0,1.24,-1],[.53,.45,.55]);
+  legs(4,.61);eyes(1.38,-1.49,.3);
+  if(s.shape==="rhino"){P("cone",[0,1.82,-1.13],[.24,.72,.24],"ffab69",0,-.25);P("box",[0,1.56,.2],[.45,.2,.72],dark);}
+  else{for(let x of [-.35,.35]){P("cone",[x,1.83,-.89],[.17,.3,.2]);P("cone",[x,.84,-1.35],[.12,.27,.12],silver,0,Math.PI);}P("box",[0,1.2,1.35],[.12,.12,.6],dark,.4);}
+  break;
+ case "beetle":
+  P("sphere",[0,.91,0],[.85,.6,1]);legs(6,.85);P("box",[0,1.48,0],[.04,.05,.81],silver);
+  P("box",[0,1.1,-1.35],[.13,.12,.65],silver);for(let i=0;i<5;i++)P("cone",[.2,1.1,-.93-i*.21],[.14,.1,.13],silver,0,Math.PI/2);
+  eyes(1.12,-.9,.36);break;
+ case "drone":
+  P("sphere",[0,.25,0],[.64,.36,.64]);P("sphere",[0,.22,-.6],[.23,.2,.09],eye);
+  for(let x of [-.9,.9])for(let z of [-.8,.8]){
+   P("box",[x/2,.3,z/2],[.6,.06,.08],dark,-Math.atan2(z,x));
+   P("cylinder",[x,.45,z],[.36,.06,.36],silver);P("box",[x,.57,z],[.5,.025,.06],c);
+  }break;
+ case "lamp":
+  P("sphere",[0,.4,0],[.52,.64,.52],"ffe9a3");
+  for(let i=0;i<6;i++){let a=i/6*TAU;P("box",[Math.cos(a)*.54,.4,Math.sin(a)*.54],[.055,.76,.055],dark);}
+  P("cylinder",[0,1.05,0],[.64,.09,.64]);P("cone",[0,1.3,0],[.4,.2,.4]);P("cylinder",[0,-.2,0],[.6,.08,.6]);eyes(.55,-.51,.2);break;
+ case "crab":
+  P("sphere",[0,.85,0],[.8,.44,.68]);legs(6,1);
+  for(let x of [-1.3,1.3]){P("box",[x,1,-.7],[.34,.27,.58]);P("box",[x,1,-1.27],[.13,.24,.25],silver);P("cone",[x*.45,1.48,0],[.16,.3,.16],silver);}
+  eyes(1.18,-.55,.4);break;
+ case "fish":case "dolphin":
+  P("sphere",[0,.1,0],[.44,.55,1.03]);P("cone",[0,.88,.05],[.12,.45,.46],silver);
+  for(let x of [-.56,.56])P("box",[x,.08,.1],[.45,.06,.32],silver,x);
+  P("box",[0,.1,1.15],[.65,.06,.32],c);
+  if(s.shape==="dolphin")P("sphere",[0,.02,-1.13],[.22,.22,.64],silver);
+  eyes(.29,-.87,.28);break;
+ case "golem":case "titan":
+  P("box",[0,1.45,0],[.84,.92,.55]);P("box",[0,2.55,0],[.52,.35,.45],dark);
+  legs(2,.5);for(let x of [-1.14,1.14]){P("box",[x,1.43,0],[.36,.76,.44]);P("sphere",[x,2.15,0],[.45,.45,.45],silver);}
+  P("sphere",[0,1.55,-.6],[.3,.34,.1],s.legend?"ffdc85":"ff9674");eyes(2.59,-.46,.26);
+  if(s.legend){P("cone",[0,3.25,0],[.42,.47,.35],silver);for(let x of [-1.3,1.3])P("cone",[x,2.68,0],[.23,.55,.3],"eed29a");}
+  break;
+ case "spider":
+  P("sphere",[0,.98,.18],[.68,.54,.91]);P("sphere",[0,1.23,.38],[.46,.3,.48],"84e9dc");
+  for(let i=0;i<8;i++){let a=i/8*TAU,x=Math.cos(a),z=Math.sin(a);
+   P("box",[x*.93,.78,z*.92],[.68,.085,.09],silver,-a,x*.22);
+   P("box",[x*1.47,.35,z*1.42],[.09,.47,.09],dark,0,x*.3);
+  }eyes(1.07,-.67,.28);break;
+ case "core":
+  P("sphere",[0,1,0],[.75,.75,.75],"d9caff");
+  for(let j=0;j<3;j++)for(let i=0;i<10;i++){
+   let a=i/10*TAU,r=1.25+j*.23;
+   P("box",[Math.cos(a)*r,1+Math.sin(a)*r*(j===1?.4:1),Math.sin(a)*r*(j===1?1:.35)],[.26,.16,.16],j===1?silver:c,-a,a);
+  }eyes(1.1,-.73,.3);break;
+ case "serpent":
+  for(let i=0;i<10;i++){let a=i/10*TAU;P("sphere",[Math.cos(a)*1.25,1+Math.sin(a)*1.15,i*.09],[.43,.4,.46],i%2?silver:c);}
+  P("sphere",[1.2,1.22,-.55],[.55,.42,.72]);for(let x of [.9,1.5])P("cone",[x,1.87,-.5],[.15,.45,.15],"ecdcaa");
+  for(let x of [.96,1.43])P("sphere",[x,1.39,-1.18],[.12,.12,.07],eye);
+ }
+ return mesh(o);
+}
+const models=SPECIES.map(buildSpecies);
+
+const SAVEKEY="mekamon_offline_v1";
+let saved=null;try{saved=JSON.parse(localStorage.getItem(SAVEKEY)||"null");}catch{}
+let state={
+ balls:3,ultra:0,wood:0,stone:0,lantern:false,lampOn:false,
+ party:[],storage:[],seen:[],caught:[],legends:{},selected:0,mode:"ball",ballKind:0,day:0,
+ ...(saved&&saved.version===1?saved.state:{})
+};
+function stats(m){
+ const b=SPECIES[m.sid].b,l=m.lv;
+ return {hp:Math.floor(b[0]*2*l/100)+l+15,atk:Math.floor(b[1]*2*l/100)+5,def:Math.floor(b[2]*2*l/100)+5,spd:Math.floor(b[3]*2*l/100)+5};
+}
+function individual(sid,lv){let m={sid,lv,xp:0,hp:1,uid:Math.random().toString(36).slice(2)};m.hp=stats(m).hp;return m;}
+if(!state.party.length&&!saved){state.party.push(individual(0,3));state.caught=[0];state.seen=[0];}
+state.selected=clamp(state.selected,0,Math.max(0,state.party.length-1));
+const player={x:-12,y:0,z:27,layer:0,hp:100,yaw:.65,pitch:-.11,boat:false,...(saved?.player||{})};
+player.boat=false;
+let started=false,paused=true,third=false,active=null,target=null,context=null,workType="",panelKind="";
+let time=0,last=0,uiClock=0,saveClock=0,throwCD=0,hitFlash=0,bannerTimer=0,manualCD=0;
+let keys={},projectiles=[],effects=[],wild=[],objects=[],deadQueue=[],pending=[];
+let boat={x:24,y:-.55,z:20,layer:0};
+const hut={x:-20,z:17,layer:0},ladder={x:-38,z:45,layer:0},caveDoor={x:101,z:8,layer:0};
+const island={x:0,z:-155};island.x=riverCenter(island.z);
+function riverCenter(z){return 49+Math.sin(z*.027)*5;}
+function waterAt(x,z){
+ if(Math.hypot(x-island.x,z-island.z)<11)return false;
+ return Math.abs(x-riverCenter(z))<16.5;
+}
+function height(x,z,layer=0){
+ if(layer===1)return -42+Math.sin(z*.07)*.7+Math.cos(x*.15)*.35;
+ if(layer===2)return -82+Math.sin(x*.06)*1.6+Math.cos(z*.07)*1.8;
+ let d=Math.abs(x-riverCenter(z)),isD=Math.hypot(x-island.x,z-island.z);
+ const mountain=55*Math.exp(-((x-134)**2/1750+(z+65)**2/2600));
+ let base=Math.sin(x*.035)*.65+Math.cos(z*.043)*.65+Math.sin((x+z)*.08)*.25;
+ let h=base+mountain;
+ if(d<23)h=lerp(-6,h,clamp((d-14)/9,0,1));
+ if(isD<15)h=Math.max(h,lerp(2.4,-5,clamp((isD-8)/7,0,1)));
+ return h;
+}
+function biome(x,z,layer){
+ if(layer===1)return "洞窟";if(layer===2)return "地下";
+ if(waterAt(x,z)||Math.hypot(x-island.x,z-island.z)<14)return "川";
+ if(x>84)return "岩山";if(x<-42&&z<25)return "森";return "草原";
+}
+function limitPos(x,z,layer){
+ if(layer===1)return [clamp(x,-24,24),clamp(z,-82,38)];
+ if(layer===2){let r=Math.hypot(x,z);if(r>110)return [x/r*110,z/r*110];return [x,z];}
+ return [clamp(x,-185,185),clamp(z,-185,185)];
+}
+player.y=height(player.x,player.z,player.layer);
+
+const terrainMeshes=[],waterData=[];
+function makeTerrain(layer){
+ let o=[],n=layer===0?100:55,span=layer===0?390:240;
+ function color(x,z,y){
+  if(layer===1)return [rr(.16,.2),rr(.17,.22),rr(.2,.26)];
+  if(layer===2)return [rr(.12,.18),rr(.2,.27),rr(.25,.31)];
+  let forest=clamp((-x-32)/35,0,1)*clamp((30-z)/35,0,1);
+  let rock=clamp((x-78)/35,0,1),snow=clamp((y-43)/12,0,1);
+  let c=[lerp(.34,.13,forest),lerp(.52,.3,forest),lerp(.27,.23,forest)];
+  c=c.map((v,i)=>lerp(v,[.46,.43,.37][i],rock));
+  c=c.map((v,i)=>lerp(v,[.8,.85,.84][i],snow));
+  const d=Math.abs(x-riverCenter(z));
+  if(d<24)c=c.map((v,i)=>lerp(v,[.43,.48,.35][i],clamp((24-d)/5,0,1)));
+  return c.map(v=>v+rr(-.035,.035));
+ }
+ for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+  let x=-span/2+i*span/n,z=-span/2+j*span/n,s=span/n;
+  let a=[x,height(x,z,layer),z],b=[x,height(x,z+s,layer),z+s],c=[x+s,height(x+s,z+s,layer),z+s],d=[x+s,height(x+s,z,layer),z];
+  tri(o,a,b,c,[color(...[a[0],a[2],a[1]]),color(b[0],b[2],b[1]),color(c[0],c[2],c[1])]);
+  tri(o,a,c,d,[color(a[0],a[2],a[1]),color(c[0],c[2],c[1]),color(d[0],d[2],d[1])]);
+ }
+ return mesh(o);
+}
+for(let i=0;i<3;i++)terrainMeshes.push(makeTerrain(i));
+for(let z=-195;z<195;z+=3)for(let k=0;k<12;k++){
+ let x1=riverCenter(z)-19+k*38/12,x2=x1+38/12;
+ let shift=riverCenter(z+3)-riverCenter(z);
+ let a=[x1,-.7,z],b=[x1+shift,-.7,z+3],c=[x2+shift,-.7,z+3],d=[x2,-.7,z];
+ tri(waterData,a,b,c,hex("387f90"));tri(waterData,a,c,d,hex("438896"));
+}
+const waterMesh=mesh(waterData);
+function modelObject(kind){
+ let a=[],P=(k,p,s,c,ry=0,rz=0)=>part(a,k,p,s,c,ry,rz);
+ if(kind==="tree"){
+  P("cylinder",[0,2.5,0],[.38,2.5,.38],"625746");
+  for(let i=0;i<3;i++)P("cone",[0,5+i*1.7,0],[2.7-i*.55,2.5,2.7-i*.55],["365d47","477654","5e8a5d"][i]);
+ }else if(kind==="broad"){
+  P("cylinder",[0,2.5,0],[.44,2.5,.44],"6e5b47");
+  P("sphere",[0,5.2,0],[3,2.35,2.8],"547854");P("sphere",[1.5,5.5,.8],[1.7,1.8,1.8],"67885a");
+ }else if(kind==="rock"){
+  P("sphere",[0,.75,0],[1.55,1.2,1.25],"888b85");P("box",[.6,.55,.3],[.7,.62,.67],"6e7774",.3,.15);
+ }else if(kind==="crystal"){
+  P("cone",[0,1.5,0],[.52,1.6,.52],"619dba");P("cone",[.6,.8,.1],[.3,.8,.3],"967ac7",0,-.3);
+ }else if(kind==="hut"){
+  P("box",[0,2.1,0],[4.5,2.1,3.6],"526b64");P("box",[0,2.1,3.64],[1.2,1.9,.08],"1f3440");
+  P("box",[0,4.8,0],[5.3,.22,4.1],"836b4e",0,.15);
+  for(let x of [-3,3]){P("box",[x,2.5,3.65],[.7,.65,.08],"e6cf87");P("box",[x,2.5,3.75],[.05,.7,.05],"40525c");}
+  P("box",[6,.8,1],[1.3,.18,1],"8a7660");
+  for(let x of [5,7])for(let z of [.3,1.7])P("box",[x,.4,z],[.1,.4,.1],"4b5c63");
+  P("sphere",[6,1.3,1],[.32,.32,.32],"75dcca");P("box",[-5,3,2],[.09,3,.09],"687d84");
+  P("box",[-5,5.3,2],[.7,.3,.08],"6ae1c3");
+ }else if(kind==="dock"){
+  P("box",[0,.05,0],[5,.16,1.4],"a49172");
+  for(let x of [-4,-1,2,4])for(let z of [-1,1])P("box",[x,-1,z],[.13,1.4,.13],"625e53");
+  for(let x=-4.5;x<5;x+=.7)P("box",[x,.23,0],[.025,.015,1.35],"655e50");
+ }else if(kind==="boat"){
+  P("box",[0,.15,0],[1.5,.4,2.6],"546d77");P("box",[0,.58,0],[1.24,.1,2.35],"b5a27d");
+  for(let x of [-1.45,1.45])P("box",[x,.78,0],[.12,.25,2.55],"6f9c9e");
+  P("box",[0,.87,.5],[1.25,.12,.3],"819893");P("cylinder",[0,1.23,-.8],[.3,.07,.3],"62eacb");
+  P("box",[0,.36,2.85],[.4,.4,.3],"344b59");
+ }else if(kind==="ladder"){
+  P("cylinder",[0,-.35,0],[2.4,.2,2.4],"172b33");
+  for(let x of [-.6,.6])P("box",[x,-1.3,1.6],[.075,3,.075],"c4c9b8");
+  for(let y=-4;y<1.6;y+=.45)P("box",[0,y,1.6],[.65,.055,.075],"d1c8a6");
+  P("box",[2,1.5,1],[.07,1.5,.07],"707a6d");P("box",[2,2.6,1],[.8,.3,.05],"b49f6a");
+ }else if(kind==="cave"){
+  P("sphere",[-4,3,0],[2.5,4,3],"646d69");P("sphere",[4,3,0],[2.5,4,3],"646d69");
+  P("sphere",[0,6.3,0],[5,2,3],"70766d");P("box",[0,2.5,-1],[2.5,2.5,.1],"07111a");
+ }else if(kind==="person"){
+  P("box",[0,1.1,0],[.34,.55,.24],"dfba72");P("sphere",[0,1.92,0],[.32,.35,.3],"bccdcc");
+  P("box",[0,1.96,-.27],[.27,.12,.04],"235463");for(let x of [-.2,.2])P("box",[x,.4,0],[.12,.4,.13],"354c59");
+  P("box",[0,1.2,.3],[.28,.35,.12],"557780");
+ }
+ return mesh(a);
+}
+const objectModels={};
+for(let n of ["tree","broad","rock","crystal","hut","dock","boat","ladder","cave","person"])objectModels[n]=modelObject(n);
+function object(kind,x,z,layer=0,scale=1,extra={}){
+ let o={kind,x,z,y:height(x,z,layer),layer,scale,ry:rr(0,TAU),respawn:0,...extra};objects.push(o);return o;
+}
+object("hut",hut.x,hut.z,0,1,{ry:0});
+object("ladder",ladder.x,ladder.z,0,1,{ry:0});
+object("cave",caveDoor.x,caveDoor.z,0,1,{ry:0});
+object("dock",28,20,0,1,{y:-.1,ry:0});
+object("dock",73,20,0,1,{y:-.1,ry:0});
+for(let i=0;i<120;i++){
+ let x=rr(-175,-43),z=rr(-165,19);object(i%4?"tree":"broad",x,z,0,rr(.7,1.25),{resource:"木材",radius:.5});
+}
+for(let i=0;i<28;i++){
+ let x=rr(-160,22),z=rr(36,170);if(dist({x,z},ladder)>8)object("broad",x,z,0,rr(.6,1),{resource:"木材",radius:.5});
+}
+for(let i=0;i<62;i++){
+ let x=rr(87,178),z=rr(-175,145);
+ if(dist({x,z},caveDoor)>11&&Math.hypot(x-134,z+65)>9)object("rock",x,z,0,rr(.6,2.3),{resource:"岩のかけら",radius:1});
+}
+object("rock",-32,27,0,.8,{resource:"岩のかけら",radius:1});
+object("broad",-39,5,0,.75,{resource:"木材",radius:.5});
+object("ladder",0,85,2,1,{ry:0});
+object("cave",0,36,1,1,{ry:Math.PI});
+object("ladder",0,-73,1,1,{ry:0});
+for(let layer of [1,2]){
+ let count=layer===1?40:90;
+ for(let i=0;i<count;i++){
+  let a=rr(0,TAU),r=rr(16,105);
+  let x=layer===1?rr(-23,23):Math.cos(a)*r,z=layer===1?rr(-78,30):Math.sin(a)*r;
+  if(Math.hypot(x,z-85)<9||Math.hypot(x,z+92)<9||Math.hypot(x,z+73)<6)continue;
+  object(i%3?"rock":"crystal",x,z,layer,rr(.65,2),{resource:i%3?"岩のかけら":null,radius:i%3?1:0});
+ }
+ for(let i=0;i<(layer===1?50:64);i++){
+  let x,z;
+  if(layer===1){x=i%2?28:-28;z=-85+Math.floor(i/2)*5;}
+  else{let a=i/64*TAU;x=Math.cos(a)*119;z=Math.sin(a)*119;}
+  object("rock",x,z,layer,rr(5,9),{sy:layer===1?2:3,wall:true});
+ }
+}
+const roofMesh=simple("box","26303a");
+
+// 出現テーブル。森林は温厚2種・攻撃2種を同数配置。
+// 草原の攻撃種のみ1体。通常種は倒された後90秒で同テーブルに再出現。
+const SPAWNS=[
+ [0,8,1,5],[1,6,1,5],[2,5,1,5],[3,1,3,5],
+ [4,5,5,11],[5,5,6,12],[6,5,4,10],[7,5,7,13],
+ [8,8,6,14],[9,6,9,17],[10,6,12,23],[11,5,15,25],
+ [12,7,15,27],[13,9,20,35]
+];
+function spawnPoint(sid){
+ const h=SPECIES[sid].hab;
+ if(h==="草原")return {x:rr(-37,19),z:rr(-27,95),layer:0};
+ if(h==="森")return {x:rr(-158,-52),z:rr(-148,10),layer:0};
+ if(h==="川"){let z=rr(-125,150);return {x:riverCenter(z)+rr(-10,10),z,layer:0};}
+ if(h==="岩山")return {x:rr(94,171),z:rr(-140,75),layer:0};
+ if(h==="洞窟")return {x:rr(-17,17),z:rr(-66,18),layer:1};
+ let a=rr(0,TAU),r=rr(15,94);return {x:Math.cos(a)*r,z:Math.sin(a)*r,layer:2};
+}
+let nextID=1;
+function createWild(sid,lv,pos){
+ const m=individual(sid,lv);
+ const w={...m,...pos,id:nextID++,home:{...pos},y:height(pos.x,pos.z,pos.layer),angle:rr(0,TAU),phase:rr(0,TAU),
+  dir:rr(0,TAU),think:rr(1,4),cool:rr(0,2),anger:0,flee:0,dead:false,capture:0,awake:false,phase2:false};
+ wild.push(w);return w;
+}
+for(let [sid,n,lo,hi] of SPAWNS)for(let i=0;i<n;i++)createWild(sid,Math.floor(rr(lo,hi+1)),spawnPoint(sid));
+wild[0].x=-9;wild[0].z=15;wild[0].home={x:-9,z:15,layer:0};
+wild[1].x=2;wild[1].z=22;wild[1].home={x:2,z:22,layer:0};
+const LEGEND_POS=[{x:134,z:-65,layer:0},{x:0,z:-92,layer:2},{x:island.x,z:island.z,layer:0}];
+for(let i=0;i<3;i++)if(!state.legends[i+14])createWild(i+14,[38,45,42][i],LEGEND_POS[i]);
+function unlocked(m){return SPECIES[m.sid].learn.filter(v=>m.lv>=v[1]).map(v=>v[0]);}
+function xpNeed(m){return 20+m.lv*15;}
+function gainXP(m,n){
+ m.xp+=n;
+ while(m.xp>=xpNeed(m)&&m.lv<60){
+  let old=stats(m).hp,known=unlocked(m).length;m.xp-=xpNeed(m);m.lv++;m.hp+=stats(m).hp-old;
+  toast(`${SPECIES[m.sid].n} が Lv${m.lv} に！`);burst(active?active.x:player.x,(active?active.y:player.y)+1,active?active.z:player.z,12,false);
+  if(unlocked(m).length>known)toast("新しい技を習得した！");
+  sound("level");
+ }
+}
+function toast(t){let e=document.createElement("div");e.className="toast";e.textContent=t;$("log").appendChild(e);while($("log").children.length>5)$("log").firstChild.remove();setTimeout(()=>e.remove(),5200);}
+function announce(t){$("banner").textContent=t;$("banner").style.opacity=1;bannerTimer=4.5;}
+function burst(x,y,z,n=12,bad=false){for(let i=0;i<n;i++)effects.push({kind:"particle",x,y,z,vx:rand(-3,3),vy:rand(1,5),vz:rand(-3,3),life:rand(.4,1),max:1,bad,layer:player.layer});}
+function beam(a,b,bad=false){effects.push({kind:"beam",a:[a.x,a.y+1,a.z],b:[b.x,b.y+1,b.z],life:.22,max:.22,bad,layer:player.layer});}
+function save(){
+ if(!started)return;
+ try{localStorage.setItem(SAVEKEY,JSON.stringify({version:1,state,player:{x:player.x,z:player.z,layer:player.layer,hp:player.hp,yaw:player.yaw,pitch:player.pitch}}));}
+ catch{}
+}
+$("saveInfo").textContent=saved?"保存された冒険を続けます":"このブラウザに自動保存されます";
+$("resetButton").onclick=()=>{if(confirm("冒険の記録を消去しますか？")){localStorage.removeItem(SAVEKEY);location.reload();}};
+
+// 音はすべてWeb Audioで生成。環境ノイズを地形ごとにフィルタリングする。
+let audio=null,master=null,ambGain=null,ambFilter=null,mute=false;
+function initAudio(){
+ if(audio){audio.resume();return;}
+ try{
+  audio=new (window.AudioContext||window.webkitAudioContext)();master=audio.createGain();master.gain.value=.22;master.connect(audio.destination);
+  let b=audio.createBuffer(1,audio.sampleRate*3,audio.sampleRate),d=b.getChannelData(0);let prev=0;
+  for(let i=0;i<d.length;i++){prev=(prev+Math.random()*.12-.06)*.98;d[i]=prev;}
+  let src=audio.createBufferSource();src.buffer=b;src.loop=true;
+  ambFilter=audio.createBiquadFilter();ambFilter.type="lowpass";ambGain=audio.createGain();ambGain.gain.value=.18;
+  src.connect(ambFilter);ambFilter.connect(ambGain);ambGain.connect(master);src.start();
+ }catch{}
+}
+function sound(kind){
+ if(!audio||mute)return;
+ let notes=kind==="capture"?[440,660,880]:kind==="level"?[523,659,784,1047]:kind==="hit"?[110,70]:kind==="throw"?[520,260]:kind==="fail"?[180,100]:[660];
+ notes.forEach((f,i)=>{
+  let o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime+i*.085;
+  o.type=kind==="hit"?"sawtooth":"sine";o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(35,f*.7),t+.13);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.23,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+.19);
+  o.connect(g);g.connect(master);o.start(t);o.stop(t+.2);
+ });
+}
+function movePosition(ent,dx,dz,kind="ground"){
+ let [nx,nz]=limitPos(ent.x+dx,ent.z+dz,ent.layer);
+ if(ent.layer===0&&kind==="ground"){
+  if(waterAt(nx,nz))return false;
+  if(Math.abs(height(nx,nz)-height(ent.x,ent.z))>Math.hypot(dx,dz)*1.2+.13)return false;
+ }
+ if(kind==="swim"){
+  if(!waterAt(nx,nz)||Math.abs(nx-riverCenter(nz))>13)return false;
+ }
+ if(kind==="ground"){
+  for(const o of objects){
+   if(o.layer!==ent.layer||o.respawn>0||!o.radius)continue;
+   let r=o.radius*o.scale+.3;
+   if(Math.hypot(nx-o.x,nz-o.z)<r&&Math.hypot(ent.x-o.x,ent.z-o.z)>=r-.05)return false;
+  }
+  if(ent.layer===0&&Math.hypot(nx-ladder.x,nz-ladder.z)<1.8)return false;
+ }
+ ent.x=nx;ent.z=nz;return true;
+}
+function creatureY(w,s,t){
+ let base=height(w.x,w.z,w.layer);
+ if(s.move.includes("遊泳")){
+  if(s.sid===9)return -.9;
+  return -2.2+Math.sin(t*2+w.phase)*.25;
+ }
+ if(s.move==="浮遊")return base+(s.legend?3.4:2.4)+Math.sin(t*1.9+w.phase)*.55;
+ return base+Math.abs(Math.sin(t*4+w.phase))*.065;
+}
+function setWildY(w){
+ const s=SPECIES[w.sid];
+ if(w.sid===9){
+  let p=(time+w.phase*2)%7.2;
+  w.air=p<1.7;
+  w.y=w.air?-.55+Math.sin(p/1.7*Math.PI)*6.5:-2.3+Math.sin(time+w.phase)*.25;
+ }else{w.y=creatureY(w,s,time);w.air=false;}
+}
+function markSeen(w){
+ if(!state.seen.includes(w.sid)){state.seen.push(w.sid);toast(`発見：${SPECIES[w.sid].n} — 図鑑に記録`);}
+}
+function recall(quiet=false){
+ if(!active)return;
+ burst(active.x,active.y+1,active.z,16);if(!quiet)toast(`${SPECIES[active.m.sid].n} を回収した`);
+ active=null;workType="";
+}
+function hurtPlayer(n,attacker){
+ if(active&&workType==="バリア"&&dist(active,player)<9){
+  const forward=[Math.sin(player.yaw),-Math.cos(player.yaw)];
+  const v=norm([attacker.x-player.x,0,attacker.z-player.z]);
+  if(forward[0]*v[0]+forward[1]*v[2]>-.05){
+   beam(active,attacker,false);gainXP(active.m,1);sound("tick");return;
+  }
+ }
+ player.hp=Math.max(0,player.hp-n);hitFlash=.8;sound("hit");
+ if(player.hp<=0){
+  recall(true);projectiles=[];pending=[];
+  for(const w of wild){w.anger=0;w.capture=0;}
+  player.layer=0;player.x=-12;player.z=27;player.y=height(player.x,player.z);player.hp=100;player.boat=false;
+  announce("草原の小屋へ帰還");toast("倒れて小屋に運ばれた。戦闘不能の仲間は小屋で回復しよう。");save();
+ }
+}
+function damageCalc(a,b,move){
+ const sa=stats(a),sb=stats(b),m=MOVES[move],st=SPECIES[a.sid],dt=SPECIES[b.sid];
+ let mult=AFFINITY[m.t]?.[dt.type]||1,stab=st.type===m.t?1.25:1;
+ return Math.max(1,Math.floor((((2*a.lv/5+2)*m.p*sa.atk/sb.def)/50+2)*rand(.85,1)*mult*stab*(a.phase2?1.4:1)));
+}
+function defeat(w){
+ if(w.dead)return;w.dead=true;burst(w.x,w.y+1,w.z,w.sid>=14?55:16);sound("level");
+ if(active){let exp=w.lv*(w.sid>=14?100:25);gainXP(active.m,exp);toast(`${SPECIES[w.sid].n} を撃破！ +${exp} EXP`);active.target=null;}
+ if(w.sid>=14){state.legends[w.sid]="撃破";announce(`${SPECIES[w.sid].n} 制圧`);save();}
+ else deadQueue.push({sid:w.sid,t:90});
+}
+function attackWild(w,move,manual=false){
+ if(!active||w.dead||w.capture||active.m.hp<=0)return;
+ const id=active.m.uid+"-"+move;
+ if((active.cds[move]||0)>0){if(manual)toast("技の冷却中");return;}
+ if(dist(active,w)>22){if(manual)toast("射程外。パートナーが接近する");active.target=w;return;}
+ active.cds[move]=MOVES[move].cd;active.target=w;active.lastCombat=time;
+ beam(active,w,false);w.anger=12;
+ if(Math.random()>MOVES[move].a){if(manual)toast("技が外れた");return;}
+ const d=damageCalc(active.m,w,move);w.hp=Math.max(0,w.hp-d);burst(w.x,w.y+1,w.z,5);
+ if(manual)toast(`${MOVES[move].n}：${d} ダメージ`);
+ sound("hit");if(w.hp<=0)defeat(w);
+}
+function wildAttack(w,victim){
+ const ids=unlocked(w),move=ids[Math.floor(Math.random()*ids.length)];
+ w.cool=MOVES[move].cd*(w.phase2?.68:1);
+ beam(w,victim,true);sound("hit");
+ if(Math.random()>MOVES[move].a)return;
+ if(victim===player){
+  let n=Math.max(3,Math.round((w.lv*.3+SPECIES[w.sid].b[1]/18)*(w.phase2?1.5:1)));
+  hurtPlayer(n,w);
+ }else if(active){
+  let d=damageCalc(w,active.m,move);active.m.hp=Math.max(0,active.m.hp-d);
+  burst(active.x,active.y+1,active.z,5,true);
+  if(active.m.hp<=0){toast(`${SPECIES[active.m.sid].n} は戦闘不能！小屋で回復できる`);recall(true);}
+  else if(!workType)active.target=w;
+ }
+}
+function updateWild(dt){
+ for(const w of wild){
+  if(w.dead||w.layer!==player.layer)continue;
+  const s=SPECIES[w.sid],dp=dist(w,player);
+  if(dp>170)continue;
+  if(dp<38)markSeen(w);
+  w.cool-=dt;w.anger=Math.max(0,w.anger-dt);w.flee=Math.max(0,w.flee-dt);
+  if(w.capture){setWildY(w);continue;}
+  if(s.legend&&dp<29&&!w.awake){w.awake=true;announce(`伝説接近 — ${s.n}`);sound("fail");}
+  w.phase2=!!s.legend&&w.hp/stats(w).hp<.4;
+  let victim=active&&dist(w,active)<dp+4?active:player;
+  let dv=dist(w,victim),homeD=dist(w,w.home),agg=s.temper==="攻撃"||(s.temper==="警戒"&&(w.id%2===0||w.anger>0))||w.anger>0;
+  let flee=s.temper==="逃走"||(s.temper==="警戒"&&w.id%2===1&&w.anger<=0);
+  let vx=0,vz=0,speed=(2.0+s.b[3]/45)*(s.move==="浮遊"?1.15:1);
+  let range=s.legend?30:s.temper==="攻撃"?15:9;
+  if((flee&&dp<15)||w.flee>0){
+   let d=Math.max(.1,dp);vx=(w.x-player.x)/d;vz=(w.z-player.z)/d;speed*=1.75;
+  }else if(agg&&(dv<range||w.anger>0||s.legend&&w.awake)&&homeD<(s.legend?23:s.temper==="攻撃"?60:30)){
+   if(s.temper==="温厚"){if(dv<7&&w.cool<=0)wildAttack(w,victim);}
+   else{
+    if(dv>5){vx=(victim.x-w.x)/Math.max(.1,dv);vz=(victim.z-w.z)/Math.max(.1,dv);}
+    if(dv<(s.legend?17:9)&&w.cool<=0)wildAttack(w,victim);
+   }
+  }else{
+   w.think-=dt;
+   if(w.think<=0){w.think=rand(2,6);w.dir+=rand(-1.8,1.8);}
+   let roam=s.move==="浮遊"?28:s.legend?4:15;
+   if(homeD>roam)w.dir=Math.atan2(w.home.x-w.x,w.home.z-w.z);
+   vx=Math.sin(w.dir)*.5;vz=Math.cos(w.dir)*.5;
+  }
+  if(w.phase2)speed*=1.4;
+  let kind=s.move.includes("遊泳")?"swim":s.move==="浮遊"?"fly":"ground";
+  if(vx||vz){
+   if(!movePosition(w,vx*speed*dt,vz*speed*dt,kind))w.dir+=Math.PI*.7;
+   w.angle=Math.atan2(vx,vz)+Math.PI;
+  }
+  setWildY(w);
+ }
+ for(let q of deadQueue)q.t-=dt;
+ for(let i=deadQueue.length-1;i>=0;i--)if(deadQueue[i].t<=0){
+  const sid=deadQueue[i].sid,sp=SPAWNS.find(r=>r[0]===sid);
+  createWild(sid,Math.floor(rand(sp[2],sp[3]+1)),spawnPoint(sid));deadQueue.splice(i,1);
+ }
+ if(wild.length>230)wild=wild.filter(w=>!w.dead);
+}
+function activeKind(){let s=SPECIES[active.m.sid];return s.move.includes("遊泳")?"swim":s.move==="浮遊"?"fly":"ground";}
+function activeMoveTo(x,z,dt){
+ let d=Math.hypot(x-active.x,z-active.z);
+ if(d>.4){
+  let speed=5+stats(active.m).spd*.055;
+  let step=Math.min(d,speed*dt),vx=(x-active.x)/d,vz=(z-active.z)/d;
+  // 仲間の水中種は地上では低空の移動カプセルを利用する。
+  let kind=activeKind();if(kind==="swim"&&!waterAt(x,z))kind="fly";
+  if(!movePosition(active,vx*step,vz*step,kind)){
+   movePosition(active,-vz*step,vx*step,kind);
+  }
+  active.angle=Math.atan2(vx,vz)+Math.PI;
+ }
+}
+function updateActive(dt){
+ if(!active)return;
+ const a=active,s=SPECIES[a.m.sid];
+ for(let k in a.cds)a.cds[k]=Math.max(0,a.cds[k]-dt);
+ a.workClock+=dt;
+ if(a.layer!==player.layer){recall(true);return;}
+ if(a.target&&(a.target.dead||a.target.capture||dist(a.target,player)>70))a.target=null;
+ if(!workType){
+  if(!a.target)a.target=wild.find(w=>!w.dead&&!w.capture&&w.layer===a.layer&&dist(w,a)<12&&dist(w,player)<35)||null;
+  if(a.target){
+   let d=dist(a,a.target);
+   if(d>8)activeMoveTo(a.target.x,a.target.z,dt);
+   else attackWild(a.target,unlocked(a.m)[0]);
+  }else if(dist(a,player)>7)activeMoveTo(player.x-2,player.z+2,dt);
+ }else{
+  a.target=null;
+  if(["伐採","採掘"].includes(workType)){
+   const resource=workType==="伐採"?"木材":"岩のかけら";
+   let near=objects.filter(o=>o.layer===a.layer&&o.resource===resource&&o.respawn<=0&&dist(o,player)<30).sort((x,y)=>dist(x,a)-dist(y,a))[0];
+   if(near){
+    activeMoveTo(near.x+2,near.z,dt);
+    if(dist(a,near)<4&&a.workClock>3){a.workClock=0;harvest(near,true);gainXP(a.m,7);}
+   }else if(dist(a,player)>7)activeMoveTo(player.x-2,player.z,dt);
+  }else{
+   let offset=workType==="バリア"?3:2;
+   const x=player.x+Math.sin(player.yaw)*offset,z=player.z-Math.cos(player.yaw)*offset;
+   activeMoveTo(x,z,dt);
+   if(a.workClock>4){
+    a.workClock=0;
+    if(workType==="発掘"&&Math.random()<.55){state.stone++;toast("発掘：岩のかけら +1");gainXP(a.m,5);}
+    else if(workType==="水中採取"&&(waterAt(a.x,a.z)||player.boat)){state.stone+=2;toast("水中採取：岩のかけら +2");gainXP(a.m,6);}
+    else if(workType==="推進"&&player.boat)gainXP(a.m,4);
+    else if(workType==="照明"&&player.layer>0||workType==="バリア")gainXP(a.m,3);
+    else if(workType==="警戒"){
+     let danger=wild.find(w=>!w.dead&&w.layer===a.layer&&SPECIES[w.sid].temper==="攻撃"&&dist(w,player)<23);
+     if(danger){toast(`警戒信号：${SPECIES[danger.sid].n} が接近`);sound("tick");gainXP(a.m,3);}
+    }
+   }
+  }
+ }
+ if(!active)return;
+ let kind=activeKind();
+ a.y=height(a.x,a.z,a.layer);
+ if(kind==="fly")a.y+=2.4+Math.sin(time*2)*.3;
+ if(kind==="swim")a.y=waterAt(a.x,a.z)&&a.layer===0?-1.9:a.y+.8;
+ if(dist(a,player)>85){recall();toast("距離が離れたため自動回収");}
+}
+function deploy(m,x,z){
+ if(m.hp<=0){toast("戦闘不能のため出せない。小屋で回復しよう");return;}
+ recall(true);
+ let s=SPECIES[m.sid],p=limitPos(x,z,player.layer);
+ if(player.layer===0&&waterAt(...p)&&!s.move.includes("遊泳")&&s.move!=="浮遊"){
+  p=[player.x,player.z];toast("地上型は水中に出せないため足元に出現");
+ }
+ active={m,x:p[0],z:p[1],y:height(...p,player.layer),layer:player.layer,angle:player.yaw,cds:{},workClock:0,target:null,lastCombat:time};
+ workType="";burst(active.x,active.y+1,active.z,24);toast(`${s.n}、フィールドへ！`);
+}
+function harvest(o,automatic=false){
+ if(o.respawn>0)return;
+ if(o.resource==="木材")state.wood+=automatic?3:1;else state.stone+=automatic?3:1;
+ o.respawn=65;burst(o.x,o.y+1,o.z,10);
+ toast(`${o.resource} +${automatic?3:1}${automatic?"（作業）":""}`);sound("tick");
+}
+function captureHit(w,p){
+ if(w.capture||w.dead)return;
+ const s=SPECIES[w.sid],ratio=w.hp/stats(w).hp;
+ let probability=s.catch/255*(.65+1.45*(1-ratio))*(p.ultra?2.25:1);
+ if(s.catch<100&&ratio>.5)probability*=.015;
+ if(s.legend){
+  probability=s.catch/255*(.15+5*Math.pow(1-ratio,3))*(p.ultra?2.25:1);
+  if(ratio>.25)probability*=.025;
+ }
+ probability=clamp(probability,.0001,.96);
+ w.capture=1.4;
+ pending.push({w,t:1.4,success:Math.random()<probability,x:w.x,y:Math.max(w.y,height(w.x,w.z,w.layer))+.3,z:w.z,ultra:p.ultra,layer:w.layer});
+ sound("throw");burst(w.x,w.y+1,w.z,14);
+}
+function finishCapture(q){
+ const w=q.w,s=SPECIES[w.sid];w.capture=0;
+ if(q.success){
+  w.dead=true;
+  const m={sid:w.sid,lv:w.lv,xp:0,hp:Math.max(1,w.hp),uid:Math.random().toString(36).slice(2)};
+  let box=state.party.length>=6;
+  (box?state.storage:state.party).push(m);
+  if(!state.caught.includes(w.sid))state.caught.push(w.sid);
+  if(!state.seen.includes(w.sid))state.seen.push(w.sid);
+  if(s.legend){state.legends[w.sid]="捕獲";announce(`伝説捕獲 — ${s.n}`);}
+  else{announce(`${s.n} を捕獲！`);deadQueue.push({sid:w.sid,t:90});}
+  toast(box?"手持ちが満員のため、小屋の格納庫に転送した":"手持ちに仲間が加わった");
+  burst(q.x,q.y,q.z,s.legend?70:25);sound("capture");save();
+ }else{
+  if(s.temper==="逃走"||s.temper==="警戒"&&w.id%2)w.flee=6;else w.anger=14;
+  toast(`${s.n} がボールを弾いた！${s.catch<100&&w.hp/stats(w).hp>.5?" もっとHPを削ろう":""}`);
+  burst(q.x,q.y,q.z,13,true);sound("fail");
+ }
+}
+let camera={eye:[0,0,0],dir:[0,0,-1],vp:identity()};
+function throwBall(){
+ if(throwCD>0||paused)return;
+ const mode=state.mode;
+ if(mode==="ball"){
+  let key=state.ballKind?"ultra":"balls";
+  if(state[key]<=0){toast("ボールがない。落ちたボールを拾うか、小屋で加工しよう");return;}
+  state[key]--;
+ }else{
+  if(active){toast("出ている仲間は R で回収してから投げよう");return;}
+  const m=state.party[state.selected];
+  if(!m||m.hp<=0){toast("出せる仲間を選ぼう。戦闘不能は小屋で回復");return;}
+  if(projectiles.some(p=>p.mode==="meka")){toast("パートナーのボールは飛行中");return;}
+ }
+ const dir=camera.dir,d=target?Math.hypot(target.x-camera.eye[0],target.y+1-camera.eye[1],target.z-camera.eye[2]):23;
+ const aim=vadd(camera.eye,vmul(dir,Math.min(d,42)));
+ const start=[player.x+Math.sin(player.yaw)*.75,player.y+(player.boat?2.3:1.8),player.z-Math.cos(player.yaw)*.75];
+ const delta=vsub(aim,start),speed=26,t=clamp(Math.hypot(...delta)/speed,.22,1.65),vel=vmul(delta,1/t);
+ vel[1]+=14*t*.5;
+ projectiles.push({x:start[0],y:start[1],z:start[2],vx:vel[0],vy:vel[1],vz:vel[2],
+  layer:player.layer,mode:mode==="ball"?"ball":"meka",ultra:!!state.ballKind,m:state.party[state.selected],
+  life:0,landed:false,legend:!!target&&SPECIES[target.sid].legend});
+ throwCD=.65;sound("throw");
+}
+function updateProjectiles(dt){
+ for(let i=projectiles.length-1;i>=0;i--){
+  let p=projectiles[i];p.life+=dt;
+  if(p.layer!==player.layer){if(p.mode==="meka")toast("移動に伴い投擲中の仲間を回収");projectiles.splice(i,1);continue;}
+  if(p.landed){if(p.life>240)projectiles.splice(i,1);continue;}
+  let old=[p.x,p.y,p.z];
+  p.vy-=14*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;
+  let hit=null;
+  if(p.mode==="ball"){
+   const step=[p.x-old[0],p.y-old[1],p.z-old[2]],len=dot(step,step);
+   for(let w of wild){
+    if(w.dead||w.capture||w.layer!==p.layer||w.sid===9&&!w.air)continue;
+    let scale=SPECIES[w.sid].legend?1.9:1;
+    let center=[w.x,w.y+(SPECIES[w.sid].move.includes("遊泳")?.15:.95)*scale,w.z];
+    let t=clamp(dot(vsub(center,old),step)/(len||1),0,1),pt=vadd(old,vmul(step,t));
+    if(Math.hypot(...vsub(center,pt))<(SPECIES[w.sid].legend?2.5:1.05)){hit=w;break;}
+   }
+  }
+  if(hit){captureHit(hit,p);projectiles.splice(i,1);continue;}
+  let ground=height(p.x,p.z,p.layer);
+  // 通常の魚には水面越しに命中する。外れたボールは水面まで浮上する。
+  if(p.y<ground+.22||p.life>4||(p.layer===0&&waterAt(p.x,p.z)&&p.y<-4.5)){
+   if(p.mode==="meka"){deploy(p.m,p.x,p.z);projectiles.splice(i,1);}
+   else if(p.legend){projectiles.splice(i,1);toast("伝説の磁場で外れたボールが消滅");}
+   else{p.landed=true;p.y=p.layer===0&&waterAt(p.x,p.z)?-.35:ground+.22;p.life=0;toast("ボールが外れた。近づいて E で回収");}
+  }
+ }
+ for(let i=pending.length-1;i>=0;i--){pending[i].t-=dt;if(pending[i].t<=0){finishCapture(pending[i]);pending.splice(i,1);}}
+}
+function chooseMove(slot){
+ if(!active){toast("まずメカモンモードで仲間を出そう");return;}
+ const moves=unlocked(active.m),id=moves[slot];
+ if(id===undefined){toast("この技はまだ習得していない");return;}
+ const w=target||active.target;
+ if(!w){toast("野生に照準を合わせて技を指示");return;}
+ workType="";active.target=w;attackWild(w,id,true);
+}
+function changeLayer(layer,x,z){
+ recall(true);projectiles=projectiles.filter(p=>p.mode!=="meka");player.boat=false;player.layer=layer;player.x=x;player.z=z;player.y=height(x,z,layer);
+ player.pitch=-.05;target=null;context=null;sound("tick");
+ toast(layer?"暗所では照明作業、または製作したランタンが有効":"地上に戻った");save();
+}
+function findContext(){
+ const near=[];
+ const add=(d,kind,label,obj)=>{if(d<5.3)near.push({d,kind,label,obj});};
+ for(let p of projectiles)if(p.landed&&p.layer===player.layer)add(dist(p,player),"pickup","落ちたボールを回収",p);
+ if(player.layer===0){
+  add(dist(player,{x:hut.x+3,z:hut.z+4}),"hut","小屋：回復 / 加工 / 格納庫",hut);
+  add(dist(player,ladder),"down","ハシゴで地下へ降りる");
+  add(dist(player,caveDoor),"cave","洞窟へ入る");
+  if(player.boat)add(0,"boat","船を降りる（岸の近く）");
+  else add(dist(player,boat),"boat","船に乗る");
+  // 両岸の桟橋には係留索があり、船が対岸にあっても呼び寄せられる。
+  if(!player.boat)for(let dock of [{x:25,z:20},{x:77,z:20}]){
+   if(dist(player,boat)>6)add(dist(player,dock),"callboat","係留索で船を呼ぶ",dock);
+  }
+ }else if(player.layer===2){
+  add(dist(player,{x:0,z:85}),"up","ハシゴで草原に上がる");
+ }else{
+  add(dist(player,{x:0,z:34}),"exitcave","洞窟から出る");
+  add(dist(player,{x:0,z:-73}),"deep","ハシゴで地下大空間へ");
+ }
+ if(active)add(dist(player,active),"recall","仲間を回収 / F で作業",active);
+ for(let o of objects)if(o.layer===player.layer&&o.resource&&o.respawn<=0)add(dist(player,o),"resource",`${o.resource}を手採取`,o);
+ near.sort((a,b)=>a.d-b.d);return near[0]||null;
+}
+function interact(){
+ const c=findContext();if(!c){toast("調べられる対象が近くにない");return;}
+ switch(c.kind){
+ case "pickup":{
+  state[c.obj.ultra?"ultra":"balls"]++;projectiles.splice(projectiles.indexOf(c.obj),1);toast("ボールを回収した");sound("tick");break;
+ }
+ case "hut":openHut();break;
+ case "down":changeLayer(2,0,82);player.yaw=0;break;
+ case "up":changeLayer(0,ladder.x,ladder.z+5);break;
+ case "cave":changeLayer(1,0,30);player.yaw=0;break;
+ case "exitcave":changeLayer(0,caveDoor.x,caveDoor.z+7);break;
+ case "deep":changeLayer(2,0,75);player.yaw=0;break;
+ case "recall":recall();break;
+ case "resource":
+  if(manualCD>0){toast("手採取は少し時間がかかる");return;}
+  manualCD=2;harvest(c.obj);break;
+ case "callboat":
+  boat.x=c.obj.x<49?riverCenter(20)-14:riverCenter(20)+14;boat.z=20;
+  toast("船を桟橋へ引き寄せた。水際に近づいて E");break;
+ case "boat":
+  if(!player.boat){
+   recall(true);player.boat=true;player.x=boat.x;player.z=boat.z;toast("乗船：WASD で操縦。岸に寄せて E で下船");
+  }else{
+   let c0=riverCenter(player.z),side=player.x<c0?-1:1;
+   if(Math.abs(player.x-c0)<10&&Math.hypot(player.x-island.x,player.z-island.z)>15){toast("もう少し岸または源流の島に近づこう");return;}
+   let x=c0+side*23,z=player.z;
+   if(Math.hypot(player.x-island.x,player.z-island.z)<16){x=island.x;z=island.z;}
+   player.boat=false;player.x=x;player.z=z;player.y=height(x,z);toast("下船した");
+  }break;
+ }
+}
+function panel(title,html,kind="other"){
+ paused=true;keys={};panelKind=kind;document.exitPointerLock?.();
+ $("panelTitle").textContent=title;$("panelContent").innerHTML=html;$("panel").style.display="flex";
+}
+function resume(){
+ $("panel").style.display="none";paused=false;panelKind="";keys={};initAudio();requestLock();
+}
+function requestLock(){try{const r=canvas.requestPointerLock();if(r?.catch)r.catch(()=>toast("クリックで視点操作を開始"));}catch{}}
+$("closePanel").onclick=resume;
+function openPause(){
+ if(!started)return;
+ save();
+ panel("フィールドメニュー",`
+ <p>メカモン ${state.caught.length}/17種 捕獲　・　伝説 ${Object.keys(state.legends).length}/3体 解決</p>
+ <div class="row"><button id="pDex">図鑑</button><button id="pHelp">操作と冒険のヒント</button><button id="pSave">保存する</button><button id="pAudio">音 ${mute?"OFF":"ON"}</button></div>
+ <div class="rule"></div><p class="muted">クリックでマウスを固定します。Esc で解除・一時停止。<br>自動保存は10秒ごと。野生の通常個体は再訪時に再生成されます。伝説の結果は保存されます。</p>`,"pause");
+ $("pDex").onclick=openDex;$("pHelp").onclick=openHelp;
+ $("pSave").onclick=()=>{save();toast("冒険を保存した");};
+ $("pAudio").onclick=()=>{toggleAudio();$("pAudio").textContent="音 "+(mute?"OFF":"ON");};
+}
+function openHelp(){
+ panel("フィールドガイド",`
+ <div class="controls">${document.querySelector(".controls").innerHTML}</div>
+ <div class="rule"></div>
+ <h3>捕獲と戦闘</h3><p>Q でモードを切り替え、中央の照準を合わせて投げます。ボールは飛行中に曲がりません。逃走型には進行方向を先読みしましょう。外れたボールは E で回収できます（伝説戦の投球は回収不可）。<br>
+ 仲間を敵の近くに出すと自動戦闘。1〜4 または右クリックで技を指示できます。R でいつでも回収して離脱可能。温厚な野生は反撃するだけで追撃しません。</p>
+ <h3>仕事と補給</h3><p>仲間を出して F。伐採・採掘は近くの資源を自動収集。バリアは視線の前方からの攻撃を防ぎます。照明は暗所を広く照らし、推進は乗船中の船速を増加させます。水中型の仲間は地上では低空移動カプセルを使います。素材は E で手採取も可能、65秒で再生。</p>
+ <h3>世界の目印</h3><p>小屋は草原の旗。船は東の大河・両岸の桟橋。森は西北。岩山は東岸、洞窟入口はその南側。草原南西の暗い穴から地下へ。伝説は岩山山頂、地下北端、大河北端の島。ミニマップの金の点が目印です。</p>
+ <h3>相性</h3><p>電気→水・風、水→炎・岩、岩→風・炎、炎→鋼、鋼→岩が2倍。風→水・炎→風は1.5倍。同タイプ技は1.25倍。HP・攻撃・防御・素早さはレベルと種族値に比例して成長します。</p>
+ <p class="muted">ランタンは小屋で製作可能。暗所の安全のため、まずルミナットなどの照明持ちを確保するのがおすすめです。</p>`,"help");
+}
+function openDex(){
+ panel("捕獲図鑑 / 全17種",`
+ <p>発見 ${state.seen.length}/17　捕獲 ${state.caught.length}/17 <small>未発見種も研究資料として基本データを閲覧できます。</small></p>
+ <div class="grid">${SPECIES.map((s,i)=>`
+ <div class="entry ${s.legend?"legend":""}">
+  <h3 style="color:#${s.color}">${String(i+1).padStart(2,"0")} ${s.n} ${s.legend?"✦":""}</h3>
+  <p class="statline">${state.caught.includes(i)?"● 捕獲済":state.seen.includes(i)?"◉ 発見済":"○ 未発見"} ${state.legends[i]?"/ 伝説"+state.legends[i]:""}</p>
+  <div><span class="tag">${s.type}</span><span class="tag">${s.hab}</span><span class="tag">${s.temper}</span></div>
+  <p style="font-size:12px;margin:9px 0">${s.desc}</p>
+  <div class="statline">移動：${s.move}<br>HP ${s.b[0]} / 攻 ${s.b[1]} / 防 ${s.b[2]} / 速 ${s.b[3]}<br>捕獲率 ${s.catch}/255<br>
+  作業：${s.skills.join("・")}<br>技：${s.learn.map(([m,l])=>`${MOVES[m].n}(Lv${l})`).join(" / ")}</div>
+ </div>`).join("")}</div>`,"dex");
+}
+function openHut(){
+ panel("草原加工小屋",`
+ <p>木材 <b>${state.wood}</b>　岩のかけら <b>${state.stone}</b>　メカボール <b>${state.balls}</b>　強化ボール <b>${state.ultra}</b></p>
+ <div class="row">
+ <button id="heal">全員回復（無料）</button>
+ <button id="craft">メカボール：木2＋岩2</button>
+ <button id="craftUltra">強化ボール：木4＋岩6 / 捕獲×2.25</button>
+ <button id="craftLamp">${state.lantern?"ランタン製作済":"ランタン：木3＋岩3"}</button>
+ <button id="hutDex">図鑑</button></div>
+ <p class="muted">手持ちが満員の場合は先に預けてください。戦闘不能もここで回復できます。</p>
+ <h3>手持ち ${state.party.length}/6</h3>
+ ${state.party.map((m,i)=>`<div class="partyrow"><span>${i+1}. ${SPECIES[m.sid].n} Lv${m.lv}　HP ${m.hp}/${stats(m).hp}</span><button data-store="${i}">預ける</button></div>`).join("")}
+ <h3 style="margin-top:20px">格納庫 ${state.storage.length}体</h3>
+ ${state.storage.length?state.storage.map((m,i)=>`<div class="partyrow"><span>${SPECIES[m.sid].n} Lv${m.lv}　HP ${m.hp}/${stats(m).hp}</span><button data-take="${i}">手持ちへ</button></div>`).join(""):"<p class='muted'>まだ預けられていません。</p>"}`,"hut");
+ $("heal").onclick=()=>{
+  for(let m of [...state.party,...state.storage])m.hp=stats(m).hp;
+  player.hp=100;toast("プレイヤーとすべての仲間が全回復！");sound("capture");save();openHut();
+ };
+ function craft(w,s,fn){
+  if(state.wood<w||state.stone<s){toast("素材が足りない。森と岩山で採取しよう");return;}
+  state.wood-=w;state.stone-=s;fn();sound("tick");save();openHut();
+ }
+ $("craft").onclick=()=>craft(2,2,()=>{state.balls++;toast("メカボールを加工した");});
+ $("craftUltra").onclick=()=>craft(4,6,()=>{state.ultra++;toast("強化ボールを加工した。B で選択");});
+ $("craftLamp").disabled=state.lantern;
+ $("craftLamp").onclick=()=>craft(3,3,()=>{state.lantern=true;state.lampOn=true;toast("ランタン完成！ L で点灯切替");});
+ $("hutDex").onclick=openDex;
+ document.querySelectorAll("[data-store]").forEach(b=>b.onclick=()=>{
+  let i=+b.dataset.store;if(active?.m===state.party[i])recall(true);
+  state.storage.push(state.party.splice(i,1)[0]);state.selected=clamp(state.selected,0,Math.max(0,state.party.length-1));save();openHut();
+ });
+ document.querySelectorAll("[data-take]").forEach(b=>b.onclick=()=>{
+  if(state.party.length>=6){toast("手持ちは6体まで");return;}
+  state.party.push(state.storage.splice(+b.dataset.take,1)[0]);save();openHut();
+ });
+}
+function openWork(){
+ if(!active){toast("まず仲間をフィールドへ出そう");return;}
+ const skills=SPECIES[active.m.sid].skills;
+ const descriptions={
+ "バリア":"前方の攻撃を防ぐ。プレイヤーの視線に追従。",
+ "伐採":"プレイヤー周囲30mの木を自動伐採。",
+ "採掘":"プレイヤー周囲30mの岩を自動採掘。",
+ "照明":"暗所を半径35mまで照らす。",
+ "推進":"乗船中の船速が大幅上昇。",
+ "水中採取":"水辺・乗船中に岩のかけらを採取。",
+ "発掘":"地面から岩のかけらを確率で発見。",
+ "警戒":"攻撃型の接近を音とメッセージで知らせる。"
+ };
+ panel(`${SPECIES[active.m.sid].n} / 作業指示`,`
+ <p>仕事をすると経験値を獲得。作業中は自動で敵を探しません。</p>
+ <div class="grid">${skills.map(s=>`<div class="entry"><h3>${s}</h3><p>${descriptions[s]}</p><button data-work="${s}">この仕事をする</button></div>`).join("")}</div>
+ <div class="rule"></div><button id="combatMode">仕事をやめる / 自動戦闘・同行</button>`,"work");
+ document.querySelectorAll("[data-work]").forEach(b=>b.onclick=()=>{
+  if(!active)return;workType=b.dataset.work;active.target=null;active.workClock=0;toast(`作業開始：${workType}`);resume();
+ });
+ $("combatMode").onclick=()=>{workType="";toast("自動戦闘・同行に切り替え");resume();};
+}
+function toggleAudio(){mute=!mute;if(master)master.gain.value=mute?0:.22;toast(mute?"音 OFF":"音 ON");}
+function select(i){state.selected=clamp(i,0,Math.max(0,state.party.length-1));updateHUD();}
+document.addEventListener("keydown",e=>{
+ if(["Tab","Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
+ if(e.code==="Escape"){if(started&&!paused)openPause();return;}
+ if(paused)return;
+ keys[e.code]=true;
+ if(e.repeat)return;
+ switch(e.code){
+ case "KeyQ":state.mode=state.mode==="ball"?"meka":"ball";sound("tick");break;
+ case "Tab":select((state.selected+(e.shiftKey?Math.max(0,state.party.length-1):1))%Math.max(1,state.party.length));break;
+ case "KeyR":recall();break;
+ case "KeyE":interact();break;
+ case "KeyF":openWork();break;
+ case "KeyJ":openDex();break;
+ case "KeyV":third=!third;break;
+ case "KeyB":state.ballKind=1-state.ballKind;break;
+ case "KeyL":
+  if(!state.lantern)toast("ランタンは草原小屋で製作できる");
+  else{state.lampOn=!state.lampOn;toast(state.lampOn?"ランタン点灯":"ランタン消灯");}break;
+ case "KeyM":toggleAudio();break;
+ case "Digit1":case "Digit2":case "Digit3":case "Digit4":chooseMove(+e.code.slice(-1)-1);break;
+ case "Space":throwBall();break;
+ }
+});
+document.addEventListener("keyup",e=>keys[e.code]=false);
+window.addEventListener("blur",()=>{keys={};if(started&&!paused)openPause();});
+document.addEventListener("pointerlockchange",()=>{
+ if(started&&document.pointerLockElement!==canvas&&!paused)openPause();
+});
+document.addEventListener("mousemove",e=>{
+ if(paused||document.pointerLockElement!==canvas)return;
+ player.yaw-=e.movementX*.0025;player.pitch=clamp(player.pitch-e.movementY*.0022,-1.25,1.15);
+});
+canvas.addEventListener("mousedown",e=>{
+ if(paused)return;
+ if(document.pointerLockElement!==canvas){requestLock();return;}
+ if(e.button===0)throwBall();if(e.button===2)chooseMove(0);
+});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+window.addEventListener("wheel",e=>{if(!paused){e.preventDefault();select((state.selected+(e.deltaY>0?1:Math.max(0,state.party.length-1)))%Math.max(1,state.party.length));}},{passive:false});
+$("startButton").onclick=()=>{
+ started=true;$("start").style.display="none";$("hud").style.display="block";paused=false;initAudio();requestLock();
+ toast("ようこそ。Q でモード切替、クリックで投擲。小屋は背後の旗が目印。");
+};
+window.addEventListener("beforeunload",save);
+
+function updatePlayer(dt){
+ const forward=(keys.KeyW?1:0)-(keys.KeyS?1:0),right=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ if(keys.ArrowLeft)player.yaw+=dt*1.5;if(keys.ArrowRight)player.yaw-=dt*1.5;
+ if(keys.ArrowUp)player.pitch=clamp(player.pitch+dt,-1.25,1.15);if(keys.ArrowDown)player.pitch=clamp(player.pitch-dt,-1.25,1.15);
+ if(forward||right){
+  let x=Math.sin(player.yaw)*forward+Math.cos(player.yaw)*right,z=-Math.cos(player.yaw)*forward+Math.sin(player.yaw)*right;
+  let n=Math.hypot(x,z);x/=n;z/=n;
+  let speed=player.boat?(workType==="推進"?16:9):(keys.ShiftLeft||keys.ShiftRight?10:5.7);
+  if(player.boat){
+   const [nx,nz]=limitPos(player.x+x*speed*dt,player.z+z*speed*dt,0);
+   if(waterAt(nx,nz)&&Math.abs(nx-riverCenter(nz))<18){player.x=nx;player.z=nz;}
+  }else{
+   if(!movePosition(player,x*speed*dt,z*speed*dt)){
+    if(!movePosition(player,x*speed*dt,0))movePosition(player,0,z*speed*dt);
+   }
+  }
+ }
+ if(player.boat){player.y=-.15;boat.x=player.x;boat.z=player.z;boat.angle=player.yaw;}
+ else player.y=height(player.x,player.z,player.layer);
+ if(player.hp<100&&!wild.some(w=>!w.dead&&w.layer===player.layer&&w.anger>0&&dist(w,player)<25))player.hp=Math.min(100,player.hp+dt*.45);
+}
+function updateCamera(){
+ const cp=Math.cos(player.pitch),dir=[Math.sin(player.yaw)*cp,Math.sin(player.pitch),-Math.cos(player.yaw)*cp];
+ let eye=[player.x,player.y+(player.boat?2.55:2.15),player.z];
+ if(third){
+  eye=vadd(eye,vmul(dir,-7));eye[1]+=1.8;
+  if(!player.boat)eye[1]=Math.max(eye[1],height(eye[0],eye[2],player.layer)+.8);
+ }
+ camera.eye=eye;camera.dir=dir;
+ camera.vp=mul(perspective(Math.PI/3,canvas.width/canvas.height,.12,330),lookAt(eye,vadd(eye,dir)));
+}
+function findTarget(){
+ let best=null,bestD=65;
+ for(let w of wild){
+  if(w.dead||w.capture||w.layer!==player.layer)continue;
+  const s=SPECIES[w.sid],size=s.legend?1.9:1;
+  let center=[w.x,w.y+(s.move.includes("遊泳")?.1:1)*size,w.z],v=vsub(center,camera.eye),d=dot(v,camera.dir);
+  if(d<1||d>bestD)continue;
+  let off=Math.hypot(...vsub(v,vmul(camera.dir,d)));
+  if(off<(s.legend?2.8:1.2)+d*.012){
+   // 中央の照準は地形・大きな遮蔽物の向こう側にロックしない。
+   let blocked=false;
+   for(let t=2;t<d-1;t+=2){
+    let p=vadd(camera.eye,vmul(camera.dir,t));
+    if(p[1]<height(p[0],p[2],player.layer)+.1){blocked=true;break;}
+   }
+   if(!blocked){best=w;bestD=d;}
+  }
+ }
+ target=best;
+}
+function updateEffects(dt){
+ for(let i=effects.length-1;i>=0;i--){
+  let e=effects[i];e.life-=dt;
+  if(e.life<=0){effects.splice(i,1);continue;}
+  if(e.kind==="particle"){e.x+=e.vx*dt;e.y+=e.vy*dt;e.z+=e.vz*dt;e.vy-=7*dt;}
+ }
+}
+function update(dt){
+ time+=dt;state.day+=dt;throwCD=Math.max(0,throwCD-dt);manualCD=Math.max(0,manualCD-dt);
+ hitFlash=Math.max(0,hitFlash-dt*1.8);bannerTimer-=dt;if(bannerTimer<=0)$("banner").style.opacity=0;
+ updatePlayer(dt);updateWild(dt);updateActive(dt);updateProjectiles(dt);updateEffects(dt);
+ for(let o of objects)if(o.respawn>0)o.respawn-=dt;
+ updateCamera();findTarget();context=findContext();
+ uiClock+=dt;saveClock+=dt;
+ if(uiClock>.12){uiClock=0;updateHUD();}
+ if(saveClock>10){saveClock=0;save();}
+ $("damage").style.opacity=hitFlash;
+ if(audio&&ambFilter){
+  const b=biome(player.x,player.z,player.layer),f=b==="川"?1700:b==="森"?650:b==="岩山"?1000:player.layer?180:800;
+  ambFilter.frequency.setTargetAtTime(f,audio.currentTime,.4);
+  ambGain.gain.setTargetAtTime(player.layer?.34:b==="川"?.4:.15,audio.currentTime,.4);
+  if(Math.random()<dt*(b==="森"?.6:.12))sound("tick");
+ }
+}
+const mapCtx=$("map").getContext("2d");
+function updateMap(){
+ const c=mapCtx,w=180;c.clearRect(0,0,w,w);
+ c.fillStyle=player.layer?"#122633":"#567755";c.fillRect(0,0,w,w);
+ const cv=(x,z)=>[90+x*.43,90+z*.43];
+ if(!player.layer){
+  c.fillStyle="#2b5545";c.fillRect(8,8,64,91);
+  c.fillStyle="#827c69";c.fillRect(126,8,54,164);
+  c.strokeStyle="#67b6c4";c.lineWidth=15;c.beginPath();
+  for(let z=-200;z<=200;z+=5){let [x,y]=cv(riverCenter(z),z);z===-200?c.moveTo(x,y):c.lineTo(x,y);}c.stroke();
+  const [ix,iz]=cv(island.x,island.z);c.fillStyle="#a6ad74";c.beginPath();c.arc(ix,iz,5,0,TAU);c.fill();
+  for(let [p,col] of [[hut,"#fff3b4"],[ladder,"#dac2ff"],[caveDoor,"#dac2ff"],[boat,"#b4efff"]]){
+   let [x,z]=cv(p.x,p.z);c.fillStyle=col;c.fillRect(x-2,z-2,4,4);
+  }
+  c.font="9px sans-serif";c.fillStyle="#d8eada";c.fillText("森",31,45);c.fillText("岩山",140,73);c.fillText("草原",61,128);
+ }else{
+  c.strokeStyle="#54757c";c.lineWidth=3;c.beginPath();
+  if(player.layer===1)c.rect(78,53,24,56);else c.arc(90,90,49,0,TAU);
+  c.stroke();c.fillStyle="#d9c3ff";let [x,z]=cv(0,player.layer===1?34:85);c.fillRect(x-2,z-2,4,4);
+ }
+ for(let w of wild){
+  if(w.dead||w.layer!==player.layer)continue;
+  if(!SPECIES[w.sid].legend&&dist(w,player)>35)continue;
+  let [x,z]=cv(w.x,w.z);c.fillStyle=SPECIES[w.sid].legend?"#ffdc85":SPECIES[w.sid].temper==="攻撃"?"#f58a75":"#d3edcd";
+  c.beginPath();c.arc(x,z,SPECIES[w.sid].legend?2.7:1.2,0,TAU);c.fill();
+ }
+ if(active){let [x,z]=cv(active.x,active.z);c.fillStyle="#70ffe0";c.fillRect(x-2,z-2,4,4);}
+ let [x,z]=cv(player.x,player.z);
+ c.save();c.translate(x,z);c.rotate(player.yaw);c.fillStyle="#fff";c.beginPath();c.moveTo(0,-5);c.lineTo(3.5,4);c.lineTo(0,2);c.lineTo(-3.5,4);c.closePath();c.fill();c.restore();
+ c.fillStyle="#e2f3ed";c.font="10px sans-serif";c.fillText("N",87,12);
+}
+function updateHUD(){
+ const b=biome(player.x,player.z,player.layer),m=state.party[state.selected];
+ $("place").textContent=b+(player.boat?" / 航行中":"");
+ $("weather").textContent=player.layer?"光の届かない機械の生態系":`${Math.floor(state.day/60)%2?"薄雲 / 風が強い":"晴天 / 金属の風"}　${Math.round(player.x)}, ${Math.round(player.z)}`;
+ $("playerHP").style.width=player.hp+"%";$("playerHP").style.background=player.hp<30?"#ff8478":"#70f3de";$("hpText").textContent=Math.ceil(player.hp);
+ $("resources").textContent=`◉ ${state.balls}　✦ ${state.ultra}　木 ${state.wood}　岩 ${state.stone}${state.lampOn?"　☀":""}`;
+ $("mode").innerHTML=`<span><strong>${state.mode==="ball"?(state.ballKind?"✦ 強化ボール":"◉ メカボール"):"◈ メカモン"}</strong> <small>Q 切替 / B 球種</small></span>
+ <span>${state.mode==="meka"?(m?`${SPECIES[m.sid].n} Lv${m.lv}`:"手持ちなし"):`所持 ${state.ballKind?state.ultra:state.balls}個`}</span>
+ <small>${active?`出現中：${SPECIES[active.m.sid].n} / ${workType||"自動戦闘"}`:"仲間未展開"}</small>`;
+ $("party").innerHTML=Array.from({length:6},(_,i)=>{
+  let m=state.party[i];
+  return `<button class="slot ${i===state.selected?"selected":""}" data-slot="${i}">${m?`<span style="color:#${SPECIES[m.sid].color}">${i+1} ${SPECIES[m.sid].n}</span><br>Lv${m.lv}　${m.hp<=0?"戦闘不能":`${m.hp}/${stats(m).hp}`}<div class="bar"><i style="width:${m.hp/stats(m).hp*100}%;background:${m.hp<=0?"#e8837d":"#70f3de"}"></i></div>`:`<span class="muted">${i+1} — EMPTY</span>`}</button>`;
+ }).join("");
+ document.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>select(+b.dataset.slot));
+ const shown=active?.m||m,ms=shown?unlocked(shown):[];
+ $("moves").innerHTML=Array.from({length:4},(_,i)=>{
+  let id=ms[i],move=MOVES[id],cd=active?.cds[id]||0;
+  return `<button data-move="${i}" ${id===undefined?"disabled":""}>${i+1} ${move?move.n:"未習得"} ${move?`<small>${cd>.05?cd.toFixed(1)+"s":"威力"+move.p}</small>`:""}</button>`;
+ }).join("");
+ document.querySelectorAll("[data-move]").forEach(b=>b.onclick=()=>chooseMove(+b.dataset.move));
+ $("reticle").classList.toggle("lock",!!target);
+ if(target){
+  const s=SPECIES[target.sid],hp=stats(target).hp;
+  $("target").style.display="block";
+  $("target").innerHTML=`<b style="color:#${s.color}">${s.legend?"✦ ":""}${s.n}</b> Lv${target.lv}
+  <div class="bar"><i style="width:${target.hp/hp*100}%;background:${target.hp/hp<.3?"#ffd781":"#70f3de"}"></i></div>
+  <small>${target.hp}/${hp}　${{"温厚":"◌","逃走":"»","攻撃":"⚡","警戒":"◇"}[s.temper]} ${s.temper}　${s.type}${target.sid===9&&!target.air?" / 水中捕獲不可":""}${target.phase2?" / 暴走形態":""}</small>`;
+ }else $("target").style.display="none";
+ $("prompt").style.display=context?"block":"none";
+ if(context)$("prompt").innerHTML=`<kbd>E</kbd> ${context.label}`;
+ updateMap();
+}
+function resize(){
+ const d=Math.min(window.devicePixelRatio||1,1.65),w=Math.floor(innerWidth*d),h=Math.floor(innerHeight*d);
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
+}
+let currentFog=[.62,.78,.8];
+function render(){
+ resize();updateCamera();
+ const b=biome(player.x,player.z,player.layer);
+ const desired=player.layer===1?[.009,.012,.02]:player.layer===2?[.006,.016,.025]:b==="森"?[.32,.48,.45]:b==="川"?[.53,.74,.83]:b==="岩山"?[.56,.62,.7]:[.61,.78,.83];
+ currentFog=currentFog.map((v,i)=>lerp(v,desired[i],.035));
+ const lighting=!!active&&workType==="照明";
+ const lamp=lighting?35:state.lantern&&state.lampOn?23:2.9;
+ gl.clearColor(...currentFog,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ gl.useProgram(program);gl.uniformMatrix4fv(un.uVP,false,camera.vp);gl.uniform3fv(un.uEye,camera.eye);
+ gl.uniform3fv(un.uFog,currentFog);gl.uniform1f(un.uTime,time);
+ gl.uniform1f(un.uDark,player.layer?1:0);gl.uniform1f(un.uLamp,lamp);
+ gl.uniform3fv(un.uLightPos,[player.x,player.y+2,player.z]);
+ gl.uniform1f(un.uFogNear,player.layer?lamp*.5:b==="森"?34:85);
+ gl.uniform1f(un.uFogFar,player.layer?lamp*1.8:b==="森"?110:230);
+ draw(terrainMeshes[player.layer],identity());
+ if(player.layer){
+  draw(roofMesh,transform(0,player.layer===1?-23:-54,0,0,player.layer===1?32:125,1,player.layer===1?90:125));
+ }
+ for(let o of objects){
+  if(o.layer!==player.layer||o.respawn>0||dist(o,player)>190)continue;
+  let sy=o.scale*(o.sy||1);
+  if(o.wall)sy*=1.3;
+  draw(objectModels[o.kind],transform(o.x,o.y,o.z,o.ry,o.scale,sy,o.scale),o.kind==="crystal"?.28:0);
+ }
+ if(player.layer===0){
+  draw(objectModels.boat,transform(boat.x,-.5+Math.sin(time*1.5)*.07,boat.z,boat.angle||0));
+  // 草原の暗い穴：円形の縁、底へ続く黒い口。
+  draw(roofMesh,transform(ladder.x,height(ladder.x,ladder.z)+.06,ladder.z,0,1.55,.05,1.55),-.36);
+ }
+ function drawCreature(w,m,ally=false){
+  let s=SPECIES[m.sid],scale=s.legend?1.9:1;
+  let y=w.y,rot=w.angle||0;
+  if(s.shape==="core")rot=time*.5;
+  let shrink=w.capture?clamp(w.capture/1.4,.12,1):1;
+  scale*=shrink;
+  draw(models[m.sid],transform(w.x,y,w.z,rot,scale,scale,scale),s.shape==="lamp"||s.shape==="core"?.22:w.phase2?.22:0);
+  if(ally)draw(ringMesh,transform(w.x,Math.max(height(w.x,w.z,w.layer)+.09,w.layer===0&&waterAt(w.x,w.z)?-.4:-999),w.z,time*.2,1.8,1,1.8),.6);
+  if(s.legend&&w.awake){
+   draw(ringMesh,transform(w.x,height(w.x,w.z,w.layer)+.12,w.z,time*.25,w.phase2?15:10,1,w.phase2?15:10),w.phase2?1.2:.7,.65);
+   for(let i=0;i<6;i++){let a=i/6*TAU+time*(w.phase2?1.7:.5);draw(goldBall,transform(w.x+Math.cos(a)*4,w.y+3+Math.sin(a*2+time),w.z+Math.sin(a)*4,0,.18),.7);}
+  }
+ }
+ for(let w of wild){
+  if(w.dead||w.layer!==player.layer||dist(w,player)>160)continue;
+  drawCreature(w,w);
+ }
+ if(active)drawCreature(active,active.m,true);
+ if(third)draw(objectModels.person,transform(player.x,player.y+(player.boat?.65:0),player.z,player.yaw));
+ if(active&&workType==="バリア"){
+  let x=player.x+Math.sin(player.yaw)*2.9,z=player.z-Math.cos(player.yaw)*2.9;
+  draw(ringMesh,transform(x,player.y+.18,z,time,2.1,1,2.1),1);
+  gl.depthMask(false);
+  draw(whiteBall,transform(x,player.y+1.8,z,player.yaw,2.1,1.9,.13),.5,.22);
+  gl.depthMask(true);
+ }
+ // 水を最後に半透明描画することで遊泳個体と川底を見せる。
+ if(player.layer===0){
+  gl.depthMask(false);draw(waterMesh,identity(),0,.53,1);gl.depthMask(true);
+ }
+ for(let p of projectiles){
+  if(p.layer!==player.layer)continue;
+  draw(p.ultra?goldBall:whiteBall,transform(p.x,p.y+(p.landed?Math.sin(time*3)*.07:0),p.z,time*5,.2),p.landed?.4:0);
+  if(p.landed)draw(ringMesh,transform(p.x,p.y-.15,p.z,0,.65,1,.65),.7);
+ }
+ for(let q of pending){
+  if(q.layer!==player.layer)continue;
+  let shake=Math.sin(time*28)*.12;
+  draw(q.ultra?goldBall:whiteBall,transform(q.x+shake,q.y,q.z,time*3,.28),.6);
+ }
+ for(let e of effects){
+  if(e.layer!==player.layer)continue;
+  if(e.kind==="particle")draw(e.bad?redFx:blueFx,transform(e.x,e.y,e.z,0,.09+e.life*.06),.9,Math.min(1,e.life*2));
+  else{
+   let d=vsub(e.b,e.a),l=Math.hypot(...d),n=Math.ceil(l/.8);
+   for(let i=0;i<=n;i++){
+    let p=vadd(e.a,vmul(d,i/n));draw(e.bad?redFx:blueFx,transform(...p,0,.11),1,e.life/e.max);
+   }
+  }
+ }
+}
+let frames=0,frameSum=0;
+function loop(stamp){
+ let dt=Math.min(.045,(stamp-last)/1000||.016);last=stamp;
+ if(started&&!paused)update(dt);
+ else if(!started){
+  time+=dt*.5;
+  for(let w of wild)if(w.layer===0)setWildY(w);
+ }
+ render();
+ frames++;frameSum+=dt;
+ if(frameSum>1){$("fps").textContent=`${Math.round(frames/frameSum)} FPS · WEBGL / LOCAL`;frames=0;frameSum=0;}
+ requestAnimationFrame(loop);
+}
+updateHUD();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
