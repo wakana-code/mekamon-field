@@ -125,6 +125,42 @@ kbd{display:inline-block;background:#2d4654;border:1px solid #66818b;border-bott
 
 <script>
 "use strict";
+
+let initializationComplete = false;
+
+function showInitializationError(message) {
+ if (initializationComplete) return;
+ const button = document.getElementById("startButton");
+ const info = document.getElementById("saveInfo");
+ if (button) {
+  button.disabled = true;
+  button.textContent = "初期化に失敗しました";
+ }
+ if (info) {
+  info.style.color = "#ffaaa0";
+  info.style.display = "block";
+  info.style.width = "100%";
+  info.style.whiteSpace = "pre-wrap";
+  info.style.overflowWrap = "anywhere";
+  info.textContent = "初期化エラー：\n" + message;
+ }
+}
+
+window.addEventListener("error", event => {
+ showInitializationError(
+  event.error?.message || event.message || "不明なエラー"
+ );
+});
+
+window.addEventListener("unhandledrejection", event => {
+ showInitializationError(
+  event.reason?.message || String(event.reason || "不明なエラー")
+ );
+});
+
+document.getElementById("startButton").disabled = true;
+document.getElementById("startButton").textContent = "ワールドを生成中…";
+
 (() => {
 const $ = id => document.getElementById(id);
 const canvas=$("game"), gl=canvas.getContext("webgl",{antialias:true,alpha:false});
@@ -151,6 +187,7 @@ function lookAt(eye,at){
  return [x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1];
 }
 const vs=`
+precision mediump float;
 attribute vec3 aPos,aNormal,aColor;
 uniform mat4 uModel,uVP;
 uniform float uTime,uWater;
@@ -1378,7 +1415,12 @@ function loop(stamp){
  if(frameSum>1){$("fps").textContent=`${Math.round(frames/frameSum)} FPS · WEBGL / LOCAL`;frames=0;frameSum=0;}
  requestAnimationFrame(loop);
 }
-updateHUD();requestAnimationFrame(loop);
+updateHUD();
+render();
+initializationComplete = true;
+$("startButton").disabled = false;
+$("startButton").textContent = "フィールドへ";
+requestAnimationFrame(loop);
 })();
 </script>
 </body>
